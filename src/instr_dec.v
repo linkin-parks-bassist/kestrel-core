@@ -69,7 +69,8 @@ module instr_decoder #(parameter data_width = 16)
 						|| operation == `BLOCK_INSTR_UMAC
 						|| operation == `BLOCK_INSTR_LUT_READ
 						|| operation == `BLOCK_INSTR_DELAY_WRITE
-						|| operation == `BLOCK_INSTR_MEM_WRITE);
+						|| operation == `BLOCK_INSTR_MEM_WRITE
+						|| operation == `BLOCK_INSTR_FILTER);
 	
 	assign arg_b_needed = (operation == `BLOCK_INSTR_MADD
 						|| operation == `BLOCK_INSTR_MIN
@@ -100,6 +101,7 @@ module instr_decoder #(parameter data_width = 16)
 			  || operation == `BLOCK_INSTR_MAX 		  || operation == `BLOCK_INSTR_CLAMP
 			  || operation == `BLOCK_INSTR_MOV_ACC	|| operation == `BLOCK_INSTR_MOV_LACC
 			  || operation == `BLOCK_INSTR_MOV_UACC)		 									branch = `INSTR_BRANCH_MISC;
+		else if (operation == `BLOCK_INSTR_FILTER)												branch = `INSTR_BRANCH_FILT;
 		else
 			branch = `INSTR_BRANCH_MADD;
 	end

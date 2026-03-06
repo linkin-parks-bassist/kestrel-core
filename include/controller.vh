@@ -9,6 +9,8 @@
 `define COMMAND_UPDATE_BLOCK_REG_0 	8'd13
 `define COMMAND_UPDATE_BLOCK_REG_1 	8'd14
 `define COMMAND_COMMIT_REG_UPDATES 	8'd15
+`define COMMAND_ALLOC_FILTER	 	8'd16
+`define COMMAND_WRITE_FILTER_COEF 	8'd17
 
 // If we're in a 'waiting' state, but no new data has
 // appeared for a whole 100ms, then it's likely

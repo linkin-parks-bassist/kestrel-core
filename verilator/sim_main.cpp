@@ -248,7 +248,7 @@ int main(int argc, char** argv)
 	
 	printf("Starting...\n");
 	
-	printf("Load delay...\n");
+	/*printf("Load delay...\n");
 	m_effect_desc *delay_desc = m_read_eff_desc_from_file("eff/del.eff");
 	printf("Load gain...\n");
 	m_effect_desc *gain_desc = m_read_eff_desc_from_file("eff/gain.eff");
@@ -277,6 +277,9 @@ int main(int argc, char** argv)
 	if (bpf_desc)   init_transformer_from_effect_desc(&bpf_trans, bpf_desc);
 	if (bsf_desc)   init_transformer_from_effect_desc(&bsf_trans, bsf_desc);
 	
+	m_transformer_set_setting(&delay_trans, "delay_ms", 1);
+	m_transformer_set_parameter(&delay_trans, "delay_gain", 128);*/
+	
 	m_fpga_transfer_batch batch = m_new_fpga_transfer_batch();
 	
 	m_eff_resource_report res;
@@ -287,11 +290,87 @@ int main(int argc, char** argv)
 
 	m_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
 	
-	m_fpga_batch_append_transformer(&batch, &delay_trans, &res, &pos);
+	m_fpga_batch_append(&batch, COMMAND_WRITE_BLOCK_INSTR);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append_32(&batch, BLOCK_INSTR_FILTER | (1 << 5));
 	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_BLOCK_INSTR);
+	m_fpga_batch_append(&batch, 1);
+	m_fpga_batch_append_32(&batch, BLOCK_INSTR_FILTER | (1 << 5) | (1 << 20));
+	
+	
+	int format = 2;
+	
+	float cutoff = 440.0;
+	float Q = 0.707;
+	
+	float omega = 2.0 * M_PI * cutoff / 44100.0;
+	float alpha = sin(omega) / (2 * Q);
+	
+	float b0 = (1.0/2.0) * (1.0 - cos(omega)) / (1.0 + alpha);
+	float b1 =             (1.0 - cos(omega)) / (1.0 + alpha);
+	float b2 = (1.0/2.0) * (1.0 - cos(omega)) / (1.0 + alpha);
+	float a1 =             (2.0 * cos(omega)) / (1.0 + alpha);
+	float a2 =                  (alpha - 1.0) / (1.0 + alpha);
+	
+	m_fpga_batch_append(&batch, COMMAND_ALLOC_FILTER);
+	m_fpga_batch_append(&batch, format);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append(&batch, 3);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append(&batch, 2);
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0); m_fpga_batch_append_16(&batch, 0);
+	m_fpga_batch_append_24(&batch, roundf(b0 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0); m_fpga_batch_append_16(&batch, 1);
+	m_fpga_batch_append_24(&batch, roundf(b1 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0); m_fpga_batch_append_16(&batch, 2);
+	m_fpga_batch_append_24(&batch, roundf(b2 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0); m_fpga_batch_append_16(&batch, 3);
+	m_fpga_batch_append_24(&batch, roundf(a1 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0); m_fpga_batch_append_16(&batch, 4);
+	m_fpga_batch_append_24(&batch, roundf(a2 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_ALLOC_FILTER);
+	m_fpga_batch_append(&batch, format);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append(&batch, 3);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append(&batch, 2);
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 1); m_fpga_batch_append_16(&batch, 0);
+	m_fpga_batch_append_24(&batch, roundf(b0 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 1); m_fpga_batch_append_16(&batch, 1);
+	m_fpga_batch_append_24(&batch, roundf(b1 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 1); m_fpga_batch_append_16(&batch, 2);
+	m_fpga_batch_append_24(&batch, roundf(b2 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 1); m_fpga_batch_append_16(&batch, 3);
+	m_fpga_batch_append_24(&batch, roundf(a1 * pow(2, 16 - format)));
+	
+	m_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 1); m_fpga_batch_append_16(&batch, 4);
+	m_fpga_batch_append_24(&batch, roundf(a2 * pow(2, 16 - format)));
+
 	m_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
 	
 	append_send_queue(batch, 70);
+	
 	
 	int samples_to_process = (n_samples < MAX_SAMPLES) ? n_samples : MAX_SAMPLES;
 	
@@ -347,7 +426,7 @@ int main(int argc, char** argv)
 			samples_processed++;
 			t += sample_duration;
 			
-			io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1500.0f * t/* * ((float)samples_processed / (float)samples_to_process)*/) * 32767.0 * 0.5f));
+			io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1500.0f * t * ((float)samples_processed / (float)samples_to_process)) * 32767.0 * 0.5f));
 			//io.sample_in = static_cast<int16_t>(in_samples[samples_processed]);
 			y = static_cast<int16_t>(io.sample_out);
 			out_samples.push_back(y);

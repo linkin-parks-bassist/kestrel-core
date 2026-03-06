@@ -57,6 +57,12 @@ module dsp_core #(
 		input  wire delay_read_valid,
 		input  wire delay_write_ack,
 		
+		output wire filter_calc_req,
+		output wire [7:0] filter_handle_out,
+		output wire signed [data_width - 1 : 0] filter_data_out,
+		input  wire signed [data_width - 1 : 0] filter_data_in,
+		input  wire filter_data_valid,
+		
 		input wire reg_writes_commit,
 		output wire regfile_syncing,
 		
@@ -797,6 +803,53 @@ module dsp_core #(
 		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_MEM])
 	);
 	
+	/**********/
+	/* Filter */
+	/**********/
+	resource_branch #(.data_width(data_width), .handle_width(8), .full_width(full_width)) filter_branch (
+		.clk(clk),
+		.reset(reset | resetting),
+		
+		.enable(enable_core),
+		
+		.in_valid(out_valid_router[`INSTR_BRANCH_FILT]),
+		.in_ready(in_ready_filt),
+		
+		.out_valid(out_valid_final_stages[`INSTR_BRANCH_FILT]),
+		.out_ready(in_ready_commit_stage[`INSTR_BRANCH_FILT]),
+		
+		.block_in(block_out_router),
+		.block_out(block_out_final_stages[`INSTR_BRANCH_FILT]),
+		
+		.write(1'b0),
+		
+		.handle_in(res_addr_out_router),
+		
+		.arg_a_in(arg_a_out_router),
+		.arg_a_out(filter_data_out),
+		
+		.arg_b_in(arg_b_out_router),
+		.arg_b_out(),
+		
+		.dest_in(dest_out_router),
+		.dest_out(dest_final_stages[`INSTR_BRANCH_FILT]),
+		
+		.handle_out(filter_handle_out),
+		
+		.read_req(filter_calc_req),
+		.write_req(),
+		
+		.data_in(filter_data_in),
+		.read_valid(filter_data_valid),
+		
+		.write_ack(1'b0),
+		
+		.result_out(result_final_stages[`INSTR_BRANCH_FILT]),
+		
+		.commit_id_in(commit_id_out_router),
+		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_FILT])
+	);
+	
 	/*****************/
 	/* Commit stages */
 	/*****************/
@@ -944,6 +997,7 @@ module dsp_core #(
 	assign out_ready_router[3] = in_ready_delay;
 	assign out_ready_router[4] = in_ready_lut;
 	assign out_ready_router[5] = in_ready_mem;
+	assign out_ready_router[6] = in_ready_filt;
 	
 	
 	/************/
@@ -977,6 +1031,9 @@ module dsp_core #(
 	wire mem_write_req;
 	wire mem_write_ack = 1;
 	wire in_ready_mem;
+	
+	// Filter branch
+	wire in_ready_filt;
 	
 	// Later (when there are more cores) the memory will be moved
 	// outside for shared access & arbitration. For now,

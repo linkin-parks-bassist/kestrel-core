@@ -10,6 +10,7 @@
 
 module dsp_pipeline #(
 		parameter data_width 		= 16,
+		parameter filter_width		= 18,
 		parameter n_blocks 			= 256
 	) (
 		input wire clk,
@@ -35,8 +36,16 @@ module dsp_pipeline #(
 		input wire [data_width - 1 : 0] ctrl_data,
 		input wire [2 * data_width - 1 : 0] delay_size,
 		input wire [2 * data_width - 1 : 0] init_delay,
+		input wire [data_width - 1 : 0] filter_order_ff,
+		input wire [data_width - 1 : 0] filter_order_fb,
+		input wire [7:0] filter_alloc_format,
 		input wire reg_update,
 		input wire reg_write,
+		
+		input wire filter_coef_write,
+		input wire [data_width - 1 : 0] filter_coef_write_handle,
+		input wire [data_width - 1 : 0] filter_coef_target,
+		input wire [17 : 0] filter_coef_data,
 		
 		input wire reg_writes_commit,
 		output wire regfile_syncing,
@@ -45,6 +54,7 @@ module dsp_pipeline #(
 		output wire instr_write_ack,
 	
 		input wire alloc_delay,
+		input wire alloc_filter,
 		output wire resetting,
 
 		output wire[7:0] out,
@@ -101,6 +111,12 @@ module dsp_pipeline #(
 		.delay_read_data (delay_read_data),
 		.delay_read_valid(delay_read_valid),
 		.delay_write_ack (delay_write_ack),
+		
+		.filter_calc_req(filter_calc_req),
+		.filter_handle_out(filter_handle_out),
+		.filter_data_out(filter_data_out),
+		.filter_data_in(filter_data_in),
+		.filter_data_valid(filter_data_valid),
 		
 		.reg_writes_commit(reg_writes_commit),
 		.regfile_syncing(regfile_syncing),
@@ -241,6 +257,35 @@ module dsp_pipeline #(
 		.mem_write_ack (delay_mem_write_ack),
 
         .any_buffers(any_delay_buffers)
+	);
+	
+	wire filter_calc_req;
+	wire [7:0] filter_handle_out;
+	wire signed [data_width - 1 : 0] filter_data_out;
+	wire signed [data_width - 1 : 0] filter_data_in;
+	wire filter_data_valid;
+	
+	filter_master #(.data_width(data_width), .n_filters(32), .mem_size(2048)) filters (
+		.clk(clk),
+		.reset(reset | resetting),
+		
+		.enable(1'b1),
+		
+		.alloc_req(alloc_filter),
+		.order_ff(filter_order_ff),
+		.order_fb(filter_order_fb),
+		.alloc_format(filter_alloc_format),
+		
+		.coef_write(filter_coef_write),
+		.coef_write_handle(filter_coef_write_handle),
+		.coef_target(filter_coef_target),
+		.coef_data(filter_coef_data),
+		
+		.calc_req(filter_calc_req),
+		.handle_in(filter_handle_out),
+		.data_in(filter_data_out),
+		.data_out(filter_data_in),
+		.out_valid(filter_data_valid)
 	);
 	
 	/**********/

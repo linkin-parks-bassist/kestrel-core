@@ -75,6 +75,16 @@ module dsp_engine #(
 		.regfile_syncing(pipeline_b_regfile_syncing),
 	
 		.alloc_delay(pipeline_a_alloc_delay),
+		.alloc_filter(pipeline_a_alloc_filter),
+		
+		.filter_coef_write(pipeline_a_filter_coef_write),
+		.filter_coef_write_handle(filter_coef_write_handle),
+		.filter_coef_target(filter_coef_target),
+		.filter_coef_data(filter_coef_data),
+		
+		.filter_order_ff(filter_order_ff),
+		.filter_order_fb(filter_order_fb),
+		.filter_alloc_format(filter_alloc_format),
 		
 		.full_reset(pipeline_a_full_reset),
 		.enable(pipeline_a_enable),
@@ -111,6 +121,16 @@ module dsp_engine #(
 		.regfile_syncing(pipeline_a_regfile_syncing),
 	
 		.alloc_delay(pipeline_b_alloc_delay),
+		.alloc_filter(pipeline_b_alloc_filter),
+		
+		.filter_coef_write(pipeline_b_filter_coef_write),
+		.filter_coef_write_handle(filter_coef_write_handle),
+		.filter_coef_target(filter_coef_target),
+		.filter_coef_data(filter_coef_data),
+		
+		.filter_order_ff(filter_order_ff),
+		.filter_order_fb(filter_order_fb),
+		.filter_alloc_format(filter_alloc_format),
 
 		.full_reset(pipeline_b_full_reset),
 		.enable(pipeline_b_enable),
@@ -205,7 +225,22 @@ module dsp_engine #(
 	/* Global control unit; executes commands recieved over SPI */
 	/************************************************************/
 	
+	localparam filter_width = 18;
+	
 	wire [7:0] control_state;
+	
+	wire [1:0] alloc_filter;
+	wire pipeline_a_alloc_filter = alloc_filter[0];
+	wire pipeline_b_alloc_filter = alloc_filter[1];
+	wire [1:0] filter_coef_write;
+	wire pipeline_a_filter_coef_write = filter_coef_write[0];
+	wire pipeline_b_filter_coef_write = filter_coef_write[1];
+	wire [data_width - 1 : 0] filter_coef_write_handle;
+	wire [data_width - 1 : 0] filter_order_ff;
+	wire [data_width - 1 : 0] filter_order_fb;
+	wire [7 : 0] filter_alloc_format;
+	wire [data_width - 1 : 0] filter_coef_target;
+	wire [filter_width : 0] filter_coef_data;
 	
 	control_unit #(.n_blocks(n_blocks), .data_width(data_width)) controller (
 		.clk(clk),
@@ -228,8 +263,16 @@ module dsp_engine #(
 		.reg_writes_commit(reg_writes_commit),
 		
 		.alloc_delay(alloc_delay),
+		.alloc_filter(alloc_filter),
 		.delay_size_out(delay_alloc_size),
 		.init_delay_out(delay_init_delay),
+		.filter_order_ff_out(filter_order_ff),
+		.filter_order_fb_out(filter_order_fb),
+		.filter_alloc_format(filter_alloc_format),
+		.filter_coef_write(filter_coef_write),
+		.filter_coef_write_handle_out(filter_coef_write_handle),
+		.filter_coef_target_out(filter_coef_target),
+		.filter_coef_data_out(filter_coef_data),
 		
 		.swap_pipelines(swap_pipelines),
 		.pipelines_swapping(pipelines_swapping),

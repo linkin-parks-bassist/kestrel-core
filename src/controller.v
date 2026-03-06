@@ -7,7 +7,8 @@
 module control_unit
 	#(
 		parameter n_blocks 			= 256,
-		parameter data_width 		= 16
+		parameter data_width 		= 16,
+		parameter filter_width		= 18
 	)
 	(
 		input wire clk,
@@ -22,12 +23,21 @@ module control_unit
 		output reg [data_width 			  - 1 : 0] data_out,
 		output reg [2 * data_width 		  - 1 : 0] delay_size_out,
 		output reg [2 * data_width 		  - 1 : 0] init_delay_out,
+		output reg [data_width 			  - 1 : 0] filter_order_ff_out,
+		output reg [data_width 			  - 1 : 0] filter_order_fb_out,
+		output reg [7 : 0] filter_alloc_format,
+		
+		output reg [data_width   - 1 : 0] filter_coef_write_handle_out,
+		output reg [data_width   - 1 : 0] filter_coef_target_out,
+		output reg [filter_width - 1 : 0] filter_coef_data_out,
 		
 		output reg [1:0] block_instr_write,
 		output reg [1:0] block_reg_write,
+		output reg [1:0] filter_coef_write,
 		output reg [1:0] reg_writes_commit,
 		input wire [1:0] pipeline_regfiles_syncing,
 		output reg [1:0] alloc_delay,
+		output reg [1:0] alloc_filter,
 		output reg [1:0] pipeline_full_reset,
 		input wire [1:0] pipeline_resetting,
 		output reg [1:0] pipeline_enables,
@@ -70,6 +80,7 @@ module control_unit
 	localparam instr_bytes   	= 4;
 	localparam delay_addr_bytes = 3;
 	localparam max_bytes_needed = 6;
+	localparam filter_coef_bytes = (filter_width > 16) ? 3 : 2;
 	
 	reg [$clog2(max_bytes_needed) - 1 : 0] byte_ctr;
 	reg [$clog2(max_bytes_needed) - 1 : 0] bytes_needed;
@@ -143,6 +154,8 @@ module control_unit
 		block_reg_write   <= 0;
 		
 		alloc_delay <= 0;
+		alloc_filter <= 0;
+		filter_coef_write <= 0;
 		
 		set_input_gain  <= 0;
 		set_output_gain <= 0;
@@ -300,6 +313,16 @@ module control_unit
 								bytes_needed <= data_bytes;
 							end
 							
+							`COMMAND_ALLOC_FILTER: begin
+								bytes_needed <= data_bytes + data_bytes + 1;
+								if (!programming) ignore_command <= 1;
+							end
+							
+							`COMMAND_WRITE_FILTER_COEF: begin
+								bytes_needed <= 1 + 2 + filter_coef_bytes;
+								if (!programming) ignore_command <= 1;
+							end
+							
 							default: begin
 								state <= READY;
 							end
@@ -403,6 +426,26 @@ module control_unit
 						`COMMAND_SET_OUTPUT_GAIN: begin
 							data_out <= {byte_1_in, byte_0_in};
 							set_output_gain <= 1;
+							state <= READY;
+						end
+						
+						`COMMAND_ALLOC_FILTER: begin
+							filter_alloc_format <= byte_4_in;
+							filter_order_ff_out <= {byte_3_in, byte_2_in};
+							filter_order_fb_out <= {byte_1_in, byte_0_in};
+							alloc_filter[back_pipeline] <= 1;
+							state <= READY;
+						end
+						
+						`COMMAND_WRITE_FILTER_COEF: begin
+							filter_coef_write_handle_out <= {byte_5_in};
+							filter_coef_target_out <= {byte_4_in, byte_3_in};
+							filter_coef_data_out <= {byte_2_in[1:0], byte_1_in, byte_0_in};
+							filter_coef_write[back_pipeline] <= 1;
+							state <= READY;
+						end
+						
+						default: begin
 							state <= READY;
 						end
 					endcase
