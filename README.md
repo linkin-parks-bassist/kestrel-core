@@ -25,7 +25,7 @@ Implements a fixed-point, pipelined, programmable audio processing core targetin
 The overall architecture of M-FPGA is shown below. The engine receives audio over I2S, processes it, and transmits it via I2S. It is intended for use with a microcontroller running the corresponding software [M-interface](github.com/linkin-parks-bassist/m-interface) and connected to the FPGA via SPI.
 
 <p align="center">
-  <img src="docs/resources/M-FPGA.svg" alt="Global schematic" width="60%">
+  <img src="docs/resources/M-fpga.svg" alt="Global schematic" width="60%">
 </p>
 
 In order to take full advantage of the limited logic and abundant time resources available on the Gowin GW2AR-18 FPGA, it was decided to use a CPU-like architecture, where DSP blocks are realised as instructions stored sequentially in a core-local BSRAM. The blocks are executed, in order, once per sample.
