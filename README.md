@@ -110,7 +110,7 @@ The assembly language, as implemented by [M-interface](https://github.com/linkin
 | `delay_mwrite`| `delay_mwrite c0 c4 $delay2`  |     |
 | `filter`      | `filter c0 $bq1 c1`           |     |
 
-### Encoding
+### Instruction Encoding
 
 Two instruction formats are supports, A and B. Format A accepts up to 3 arguments and has fields relevant for arithmetic, while format B replaces the third operand and arithmetic fields with a `handle` field used in resource access.
 
@@ -131,13 +131,17 @@ Format B:
     +--------+---+-------+-------+------+----------------------+
 ```
 
-- `opcode`	   : 5 bits opcode
-- `f`          : 1 bit indicating format; low indicates format A, high format B
-- `src [A|B|C]`: 4 bits specifying a channel/register address, plus one bit determining channel vs register.
-- `dest`       : 4 bit destination channel address
-- `shift`      : 5 bits; either the number of bits to shift (for `arsh/rsh/lsh`) or, for multiplication operations, the difference between `data_width - 1` and the required number of bits to shift to compensate for fixed point formats.
-- `s`          : 1 bit; disables saturation for channel arithmetic if high
-- `handle`	   : 12 bits; an identifier/address for either lookup tables, memory, delay buffers or filter slots, according to the resource determined by the opcode.
+#### Fields
+
+| Field        | Bits | Description                                                    |
+| ------------ | ---- | -------------------------------------------------------------- |
+| `opcode`     | 5    | opcode                                                         |
+| `f`          | 1    | instruction format (`0` = Format A, `1` = Format B)            |
+| `src X`      | 5    | 4-bit channel/register index + 1-bit channel/register selector |
+| `dest`       | 4    | destination channel address                                    |
+| `shift`      | 5    | shift amount or fixed-point compensation shift                 |
+| `s`          | 1    | high-active saturation disable in channel arithmetic if high   |
+| `handle`     | 12   | resource handle; LUT/delay/filter ID or memory address         |
 
 ## License
 
