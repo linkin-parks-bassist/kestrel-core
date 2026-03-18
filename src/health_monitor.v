@@ -55,6 +55,11 @@ module health_monitor #(parameter data_width = 16)
 			envelope_1_valid <= 0;
 			envelope_2_valid <= 0;
 			envelope_valid 	 <= 0;
+			
+			envelope <= 0;
+			envelope_1 <= 0;
+			envelope_2 <= 0;
+			abs <= 0;
 		end else if (enable) begin
 			if (sample_valid) begin
 				abs <= sample_in < 0 ? -sample_in : sample_in;
