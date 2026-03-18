@@ -164,8 +164,8 @@ void pop_send_queue()
 	
 	send_queue = send_queue->next;
 	
-	if (ol->batch.buf)
-		free(ol->batch.buf);
+	//if (ol->batch.buf)
+		//free(ol->batch.buf);
 	free(ol);
 }
 
@@ -205,26 +205,27 @@ int main(int argc, char** argv)
     Verilated::commandArgs(argc, argv);
     Verilated::randReset(2);
 
-    if (argc < 3)
+	std::vector<int16_t> in_samples;
+	WavHeader header;
+	
+	int use_wavs = 0;
+	
+    const char* in_path  = NULL;
+	const char* out_path = NULL;
+	
+    if (argc > 3)
     {
-        std::cerr << "Usage: " << argv[0] << " in.wav out.wav\n";
-        return 1;
+		use_wavs = 1;
+        in_path  = argv[1];
+		out_path = argv[2];
+
+		if (!read_wav16_mono(in_path, header, in_samples)) {
+			std::cerr << "Failed to read WAV\n";
+			return 1;
+		}
     }
     
     sim_io_init(&io);
-
-    const char* in_path  = argv[1];
-    const char* out_path = argv[2];
-    char out_path_em[256];
-    
-    sprintf(out_path_em, "%s.em.wav", out_path);
-
-    WavHeader header;
-    std::vector<int16_t> in_samples;
-    if (!read_wav16_mono(in_path, header, in_samples)) {
-        std::cerr << "Failed to read WAV\n";
-        return 1;
-    }
 
     std::vector<int16_t> out_samples;
     std::vector<int16_t> out_samples_emulated;
@@ -248,47 +249,38 @@ int main(int argc, char** argv)
 	
 	printf("Starting...\n");
 	
-	/*printf("Load delay...\n");
-	m_effect_desc *delay_desc = m_read_eff_desc_from_file("eff/del.eff");
-	printf("Load gain...\n");
-	m_effect_desc *gain_desc = m_read_eff_desc_from_file("eff/gain.eff");
 	printf("Load low pass filter...\n");
-	m_effect_desc *lpf_desc = m_read_eff_desc_from_file("eff/lpf.eff");
-	printf("Load high pass filter...\n");
-	m_effect_desc *hpf_desc = m_read_eff_desc_from_file("eff/hpf.eff");
-	printf("Load band pass filter...\n");
-	m_effect_desc *bpf_desc = m_read_eff_desc_from_file("eff/bpf.eff");
-	printf("Load band stop filter...\n");
-	m_effect_desc *bsf_desc = m_read_eff_desc_from_file("eff/bsf.eff");
+	m_effect_desc *lpf_desc = m_read_eff_desc_from_file("eff/LPF.EFF");
 	
-	printf("Effects loaded.\n");
+	if (!lpf_desc)
+	{
+		printf("Failed.\n");
+		abort();
+	}
 	
-	m_transformer delay_trans;
-	m_transformer gain_trans;
-	m_transformer lpf_trans;
-	m_transformer hpf_trans;
-	m_transformer bpf_trans;
-	m_transformer bsf_trans;
+	m_effect delay_effect;
+	m_effect gain_effect;
+	m_effect lpf_effect;
+	m_effect lpf_effect2;
+	m_effect hpf_effect;
+	m_effect bpf_effect;
+	m_effect bsf_effect;
 	
-	if (delay_desc) init_transformer_from_effect_desc(&delay_trans, delay_desc);
-	if (gain_desc)  init_transformer_from_effect_desc(&gain_trans, gain_desc);
-	if (lpf_desc)   init_transformer_from_effect_desc(&lpf_trans, lpf_desc);
-	if (hpf_desc)   init_transformer_from_effect_desc(&hpf_trans, hpf_desc);
-	if (bpf_desc)   init_transformer_from_effect_desc(&bpf_trans, bpf_desc);
-	if (bsf_desc)   init_transformer_from_effect_desc(&bsf_trans, bsf_desc);
-	
-	m_transformer_set_setting(&delay_trans, "delay_ms", 1);
-	m_transformer_set_parameter(&delay_trans, "delay_gain", 128);*/
+	if (lpf_desc)   init_effect_from_effect_desc(&lpf_effect, lpf_desc);
+	if (lpf_desc)   init_effect_from_effect_desc(&lpf_effect2, lpf_desc);
 	
 	m_fpga_transfer_batch batch = m_new_fpga_transfer_batch();
 	
-	m_eff_resource_report res;
-	res.memory = 0;
-	res.delays = 0;
+	m_eff_resource_report res = empty_m_eff_resource_report();
 	
 	int pos = 0;
 
 	m_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
+	m_fpga_batch_append_effect(&batch, &lpf_effect, &res, &pos);
+	//m_fpga_batch_append_effect(&batch, &lpf_effect2, &res, &pos);
+	m_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
+	
+	/*m_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
 	
 	m_fpga_batch_append(&batch, COMMAND_WRITE_BLOCK_INSTR);
 	m_fpga_batch_append(&batch, 0);
@@ -367,12 +359,58 @@ int main(int argc, char** argv)
 	m_fpga_batch_append(&batch, 1); m_fpga_batch_append_16(&batch, 4);
 	m_fpga_batch_append_24(&batch, roundf(a2 * pow(2, 16 - format)));
 
-	m_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
+	m_fpga_batch_append(&batch, COMMAND_END_PROGRAM);*/
 	
 	append_send_queue(batch, 70);
+	float c;
+	int32_t s;
+	batch = m_new_fpga_transfer_batch();
+	
+	m_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append_16(&batch, 0);
+	c = 1.0;
+	s = float_to_q_nminus1_18bit(c, 1);
+	m_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
+	
+	m_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append_16(&batch, 1);
+	c = 0;
+	s = float_to_q_nminus1_18bit(c, 1);
+	m_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
+	
+	m_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append_16(&batch, 2);
+	c = 0;
+	s = float_to_q_nminus1_18bit(c, 1);
+	m_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
+	
+	m_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append_16(&batch, 3);
+	c = 0;
+	s = float_to_q_nminus1_18bit(c, 1);
+	m_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
+	
+	m_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
+	m_fpga_batch_append(&batch, 0);
+	m_fpga_batch_append_16(&batch, 4);
+	c = 0;
+	s = float_to_q_nminus1_18bit(c, 1);
+	m_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
+	
+	
+	m_fpga_batch_append(&batch, COMMAND_COMMIT_FILTER_COEF);
+	
+	
+	append_send_queue(batch, 1024);
 	
 	
 	int samples_to_process = (n_samples < MAX_SAMPLES) ? n_samples : MAX_SAMPLES;
+	if (!use_wavs)
+		samples_to_process = MAX_SAMPLES;
 	
 	#ifdef RUN_EMULATOR
 	sim_engine *emulator = new_sim_engine();
@@ -426,10 +464,14 @@ int main(int argc, char** argv)
 			samples_processed++;
 			t += sample_duration;
 			
-			io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1500.0f * t * ((float)samples_processed / (float)samples_to_process)) * 32767.0 * 0.5f));
+			io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1200.0f * t * ((float)samples_processed / (float)samples_to_process)) * 32767.0 * 0.5f));
 			//io.sample_in = static_cast<int16_t>(in_samples[samples_processed]);
-			y = static_cast<int16_t>(io.sample_out);
-			out_samples.push_back(y);
+			
+			if (use_wavs)
+			{
+				y = static_cast<int16_t>(io.sample_out);
+				out_samples.push_back(y);
+			}
 			io.i2s_ready = 0;
 			
 			#ifdef RUN_EMULATOR
@@ -459,11 +501,14 @@ int main(int argc, char** argv)
     write_wav16_mono(out_path_em, header.sample_rate, out_samples_emulated);
     #endif
     
-    if (!write_wav16_mono(out_path, header.sample_rate, out_samples))
+    if (use_wavs)
     {
-        std::cerr << "Failed to write WAV\n";
-        return 1;
-    }
+		if (!write_wav16_mono(out_path, header.sample_rate, out_samples))
+		{
+			std::cerr << "Failed to write WAV\n";
+			return 1;
+		}
+	}
 
     delete dut;
     return 0;

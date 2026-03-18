@@ -34,6 +34,7 @@ module control_unit
 		output reg [1:0] block_instr_write,
 		output reg [1:0] block_reg_write,
 		output reg [1:0] filter_coef_write,
+		output reg [1:0] filter_coef_commit,
 		output reg [1:0] reg_writes_commit,
 		input wire [1:0] pipeline_regfiles_syncing,
 		output reg [1:0] alloc_delay,
@@ -42,6 +43,8 @@ module control_unit
 		input wire [1:0] pipeline_resetting,
 		output reg [1:0] pipeline_enables,
 		output reg [1:0] pipeline_reset,
+		
+		input wire [1:0] filter_ack,
 		
 		output reg swap_pipelines,
 		input wire pipelines_swapping,
@@ -112,6 +115,7 @@ module control_unit
     localparam SWAP_WAIT  		  = 3'd4;
     localparam RESET_WAIT 		  = 3'd5;
     localparam INITIAL_RESET_WAIT = 3'd6;
+    localparam FILTER_COMMIT_WAIT = 3'd7;
 
 	wire front_pipeline = current_pipeline;
 	wire back_pipeline = ~current_pipeline;
@@ -323,6 +327,15 @@ module control_unit
 								if (!programming) ignore_command <= 1;
 							end
 							
+							`COMMAND_UPDATE_FILTER_COEF: begin
+								bytes_needed <= 1 + 2 + filter_coef_bytes;
+							end
+							
+							`COMMAND_COMMIT_FILTER_COEF: begin
+								state <= FILTER_COMMIT_WAIT;
+								filter_coef_commit[front_pipeline] <= 1;
+							end
+							
 							default: begin
 								state <= READY;
 							end
@@ -442,7 +455,29 @@ module control_unit
 							filter_coef_target_out <= {byte_4_in, byte_3_in};
 							filter_coef_data_out <= {byte_2_in[1:0], byte_1_in, byte_0_in};
 							filter_coef_write[back_pipeline] <= 1;
-							state <= READY;
+							filter_coef_commit[back_pipeline] <= 1;
+							
+							if (filter_coef_write[back_pipeline] && filter_ack[back_pipeline]) begin
+								state <= READY;
+								filter_coef_write[back_pipeline] <= 0;
+								filter_coef_commit[back_pipeline] <= 0;
+								wait_one <= 1;
+							end
+						end
+						
+						`COMMAND_UPDATE_FILTER_COEF: begin
+							filter_coef_write_handle_out <= {byte_5_in};
+							filter_coef_target_out <= {byte_4_in, byte_3_in};
+							filter_coef_data_out <= {byte_2_in[1:0], byte_1_in, byte_0_in};
+							filter_coef_write[front_pipeline] <= 1;
+							filter_coef_commit[front_pipeline] <= 0;
+							
+							if (filter_coef_write[front_pipeline] && filter_ack[front_pipeline]) begin
+								state <= READY;
+								filter_coef_write[front_pipeline] <= 0;
+								filter_coef_commit[front_pipeline] <= 0;
+								wait_one <= 1;
+							end
 						end
 						
 						default: begin
@@ -504,6 +539,13 @@ module control_unit
 						pipeline_enables[front_pipeline] <= 1;
 						
 						spi_byte_out <= SPI_RESPONSE_OK;
+					end
+				end
+				
+				FILTER_COMMIT_WAIT: begin
+					if (~wait_one & filter_ack[front_pipeline]) begin
+						filter_coef_commit <= 0;
+						state <= READY;
 					end
 				end
 			endcase

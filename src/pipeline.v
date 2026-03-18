@@ -43,9 +43,12 @@ module dsp_pipeline #(
 		input wire reg_write,
 		
 		input wire filter_coef_write,
+		input wire filter_coef_commit,
 		input wire [data_width - 1 : 0] filter_coef_write_handle,
 		input wire [data_width - 1 : 0] filter_coef_target,
 		input wire [17 : 0] filter_coef_data,
+		
+		output wire filter_ack,
 		
 		input wire reg_writes_commit,
 		output wire regfile_syncing,
@@ -277,9 +280,12 @@ module dsp_pipeline #(
 		.alloc_format(filter_alloc_format),
 		
 		.coef_write(filter_coef_write),
+		.coef_commit(filter_coef_commit),
 		.coef_write_handle(filter_coef_write_handle),
 		.coef_target(filter_coef_target),
 		.coef_data(filter_coef_data),
+		
+		.coef_ack(filter_ack),
 		
 		.calc_req(filter_calc_req),
 		.handle_in(filter_handle_out),

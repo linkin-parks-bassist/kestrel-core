@@ -78,9 +78,12 @@ module dsp_engine #(
 		.alloc_filter(pipeline_a_alloc_filter),
 		
 		.filter_coef_write(pipeline_a_filter_coef_write),
+		.filter_coef_commit(pipeline_a_filter_coef_commit),
 		.filter_coef_write_handle(filter_coef_write_handle),
 		.filter_coef_target(filter_coef_target),
 		.filter_coef_data(filter_coef_data),
+		
+		.filter_ack(filter_ack[0]),
 		
 		.filter_order_ff(filter_order_ff),
 		.filter_order_fb(filter_order_fb),
@@ -124,9 +127,12 @@ module dsp_engine #(
 		.alloc_filter(pipeline_b_alloc_filter),
 		
 		.filter_coef_write(pipeline_b_filter_coef_write),
+		.filter_coef_commit(pipeline_b_filter_coef_commit),
 		.filter_coef_write_handle(filter_coef_write_handle),
 		.filter_coef_target(filter_coef_target),
 		.filter_coef_data(filter_coef_data),
+		
+		.filter_ack(filter_ack[1]),
 		
 		.filter_order_ff(filter_order_ff),
 		.filter_order_fb(filter_order_fb),
@@ -233,8 +239,12 @@ module dsp_engine #(
 	wire pipeline_a_alloc_filter = alloc_filter[0];
 	wire pipeline_b_alloc_filter = alloc_filter[1];
 	wire [1:0] filter_coef_write;
-	wire pipeline_a_filter_coef_write = filter_coef_write[0];
-	wire pipeline_b_filter_coef_write = filter_coef_write[1];
+	wire [1:0] filter_coef_commit;
+	wire [1:0] filter_ack;
+	wire pipeline_a_filter_coef_write  = filter_coef_write [0];
+	wire pipeline_a_filter_coef_commit = filter_coef_commit[0];
+	wire pipeline_b_filter_coef_write  = filter_coef_write [1];
+	wire pipeline_b_filter_coef_commit = filter_coef_commit[1];
 	wire [data_width - 1 : 0] filter_coef_write_handle;
 	wire [data_width - 1 : 0] filter_order_ff;
 	wire [data_width - 1 : 0] filter_order_fb;
@@ -270,6 +280,8 @@ module dsp_engine #(
 		.filter_order_fb_out(filter_order_fb),
 		.filter_alloc_format(filter_alloc_format),
 		.filter_coef_write(filter_coef_write),
+		.filter_coef_commit(filter_coef_commit),
+		.filter_ack(filter_ack),
 		.filter_coef_write_handle_out(filter_coef_write_handle),
 		.filter_coef_target_out(filter_coef_target),
 		.filter_coef_data_out(filter_coef_data),
