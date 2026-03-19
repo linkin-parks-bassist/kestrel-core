@@ -15,7 +15,7 @@
 #define VERILATOR
 #endif
 
-#include <libM/m_lib.h>
+#include <libkest/kest_lib.h>
 
 #include "sim_io.h"
 

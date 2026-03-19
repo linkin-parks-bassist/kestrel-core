@@ -13,6 +13,7 @@ TEST_MODULES = [
     "control_unit",
     "filter_master",
     "delay_master",
+    "multiply_stage"
 ]
 
 module_re = re.compile(r"\bmodule\s+(\w+)\b")
@@ -61,7 +62,15 @@ std::vector<Test>& get_tests()
 }}
 
 static vluint64_t sim_time = 0;
+static VerilatedVcdC* g_current_tfp = nullptr;
+static const char* g_current_test_name = nullptr;
+
 double sc_time_stamp() {{ return sim_time; }}
+
+void settle(V{module}* dut, VerilatedVcdC* tfp)
+{{
+    dut->eval();
+}}
 
 void tick(V{module}* dut, VerilatedVcdC* tfp)
 {{
@@ -72,6 +81,111 @@ void tick(V{module}* dut, VerilatedVcdC* tfp)
     dut->clk = 0;
     dut->eval();
     if (tfp) tfp->dump(sim_time++);
+}}
+
+void test_fail_eq(const char* expr_a,
+                  const char* expr_b,
+                  long long got,
+                  long long expected,
+                  const char* file,
+                  int line)
+{{
+    printf("FAIL at %s:%d: %s != %s (got %lld expected %lld)\\n",
+           file, line, expr_a, expr_b, got, expected);
+
+#ifdef TRACE
+    if (g_current_tfp) {{
+        g_current_tfp->flush();
+        g_current_tfp->close();
+        delete g_current_tfp;
+        g_current_tfp = nullptr;
+    }}
+
+    if (g_current_test_name) {{
+        printf("Trace saved to %s.vcd\\n", g_current_test_name);
+    }}
+#endif
+
+    exit(1);
+}}
+
+void test_fail_ne(const char* expr_a,
+                  const char* expr_b,
+                  long long got,
+                  const char* file,
+                  int line)
+{{
+    printf("FAIL at %s:%d: %s == %s (both %lld, expected different)\\n",
+           file, line, expr_a, expr_b, got);
+
+#ifdef TRACE
+    if (g_current_tfp) {{
+        g_current_tfp->flush();
+        g_current_tfp->close();
+        delete g_current_tfp;
+        g_current_tfp = nullptr;
+    }}
+
+    if (g_current_test_name) {{
+        printf("Trace saved to %s.vcd\\n", g_current_test_name);
+    }}
+#endif
+
+    exit(1);
+}}
+
+void test_fail_u(const char* expr_a,
+                 const char* expr_b,
+                 unsigned long long got,
+                 unsigned long long expected,
+                 unsigned width,
+                 const char* file,
+                 int line)
+{{
+    printf("FAIL at %s:%d: %s != %s (got %llu expected %llu, width=%u)\\n",
+           file, line, expr_a, expr_b, got, expected, width);
+
+#ifdef TRACE
+    if (g_current_tfp) {{
+        g_current_tfp->flush();
+        g_current_tfp->close();
+        delete g_current_tfp;
+        g_current_tfp = nullptr;
+    }}
+
+    if (g_current_test_name) {{
+        printf("Trace saved to %s.vcd\\n", g_current_test_name);
+    }}
+#endif
+
+    exit(1);
+}}
+
+void test_fail_s(const char* expr_a,
+                 const char* expr_b,
+                 long long got,
+                 long long expected,
+                 unsigned width,
+                 const char* file,
+                 int line)
+{{
+    printf("FAIL at %s:%d: %s != %s (got %lld expected %lld, width=%u)\\n",
+           file, line, expr_a, expr_b, got, expected, width);
+
+#ifdef TRACE
+    if (g_current_tfp) {{
+        g_current_tfp->flush();
+        g_current_tfp->close();
+        delete g_current_tfp;
+        g_current_tfp = nullptr;
+    }}
+
+    if (g_current_test_name) {{
+        printf("Trace saved to %s.vcd\\n", g_current_test_name);
+    }}
+#endif
+
+    exit(1);
 }}
 
 int main(int argc, char** argv)
@@ -93,9 +207,11 @@ int main(int argc, char** argv)
 
     for (auto& t : tests) {{
         printf("=== %s ===\\n", t.name);
+        g_current_test_name = t.name;
 
 #ifdef TRACE
         tfp = new VerilatedVcdC;
+        g_current_tfp = tfp;
 
         char fname[256];
         snprintf(fname, sizeof(fname), "%s.vcd", t.name);
@@ -109,14 +225,20 @@ int main(int argc, char** argv)
         dut->reset = 1;
         for (int i = 0; i < 5; i++) tick(dut, tfp);
         dut->reset = 0;
+        settle(dut, tfp);
 
         t.fn(dut, tfp);
 
 #ifdef TRACE
-        tfp->close();
-        delete tfp;
-        tfp = nullptr;
+        if (tfp) {{
+            tfp->flush();
+            tfp->close();
+            delete tfp;
+            tfp = nullptr;
+        }}
+        g_current_tfp = nullptr;
 #endif
+        g_current_test_name = nullptr;
     }}
 
     printf("All tests passed.\\n");
@@ -134,6 +256,7 @@ TEST_FRAMEWORK_TEMPLATE = textwrap.dedent("""\
 #include <functional>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 
 #include "V{module}.h"
 #include <verilated_vcd_c.h>
@@ -145,6 +268,30 @@ struct Test {{
 
 std::vector<Test>& get_tests();
 
+static inline uint64_t mask_u(unsigned width)
+{{
+    return (width >= 64) ? ~0ULL : ((1ULL << width) - 1);
+}}
+
+static inline uint64_t bits_u(uint64_t x, unsigned width)
+{{
+    return x & mask_u(width);
+}}
+
+static inline int64_t bits_s(uint64_t x, unsigned width)
+{{
+    x &= mask_u(width);
+
+    if (width == 0)
+        return 0;
+
+    uint64_t sign_bit = 1ULL << (width - 1);
+    if (x & sign_bit)
+        x |= ~mask_u(width);
+
+    return (int64_t)x;
+}}
+
 #define TEST(name) \\
     void name(V{module}*, VerilatedVcdC*); \\
     struct name##_registrar {{ \\
@@ -154,18 +301,73 @@ std::vector<Test>& get_tests();
     }} name##_registrar_instance; \\
     void name(V{module}* dut, VerilatedVcdC* tfp)
 
+void test_fail_eq(const char* expr_a,
+                  const char* expr_b,
+                  long long got,
+                  long long expected,
+                  const char* file,
+                  int line);
+
+void test_fail_ne(const char* expr_a,
+                  const char* expr_b,
+                  long long got,
+                  const char* file,
+                  int line);
+
+void test_fail_u(const char* expr_a,
+                 const char* expr_b,
+                 unsigned long long got,
+                 unsigned long long expected,
+                 unsigned width,
+                 const char* file,
+                 int line);
+
+void test_fail_s(const char* expr_a,
+                 const char* expr_b,
+                 long long got,
+                 long long expected,
+                 unsigned width,
+                 const char* file,
+                 int line);
+
 #define EXPECT_EQ(a,b) \\
-    if ((a)!=(b)) {{ \\
-        printf("FAIL: %s != %s (got %d expected %d)\\n", #a, #b, (int)(a), (int)(b)); \\
-        exit(1); \\
-    }}
+    do {{ \\
+        long long _a = (long long)(a); \\
+        long long _b = (long long)(b); \\
+        if (_a != _b) {{ \\
+            test_fail_eq(#a, #b, _a, _b, __FILE__, __LINE__); \\
+        }} \\
+    }} while (0)
 
 #define EXPECT_NE(a,b) \\
-    if ((a)==(b)) {{ \\
-        printf("FAIL: %s == %s (both %d, expected different)\\n", #a, #b, (int)(a)); \\
-        exit(1); \\
-    }}
+    do {{ \\
+        long long _a = (long long)(a); \\
+        long long _b = (long long)(b); \\
+        if (_a == _b) {{ \\
+            (void)_b; \\
+            test_fail_ne(#a, #b, _a, __FILE__, __LINE__); \\
+        }} \\
+    }} while (0)
 
+#define EXPECT_U(width, actual, expected) \\
+    do {{ \\
+        unsigned long long _a = (unsigned long long)bits_u((uint64_t)(actual), (width)); \\
+        unsigned long long _e = (unsigned long long)bits_u((uint64_t)(expected), (width)); \\
+        if (_a != _e) {{ \\
+            test_fail_u(#actual, #expected, _a, _e, (unsigned)(width), __FILE__, __LINE__); \\
+        }} \\
+    }} while (0)
+
+#define EXPECT_S(width, actual, expected) \\
+    do {{ \\
+        long long _a = (long long)bits_s((uint64_t)(actual), (width)); \\
+        long long _e = (long long)(expected); \\
+        if (_a != _e) {{ \\
+            test_fail_s(#actual, #expected, _a, _e, (unsigned)(width), __FILE__, __LINE__); \\
+        }} \\
+    }} while (0)
+
+extern void settle(V{module}* dut, VerilatedVcdC* tfp);
 extern void tick(V{module}* dut, VerilatedVcdC* tfp);
 """)
 
