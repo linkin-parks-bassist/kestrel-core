@@ -136,7 +136,7 @@ localparam [2:0] BURST_LEN = 3'b0;      // burst length 1
 localparam BURST_MODE = 1'b0;           // sequential
 localparam [10:0] MODE_REG = {4'b0, CAS[2:0], BURST_MODE, BURST_LEN};
 
-localparam addr_offs = $clog2(data_width) / 8;
+localparam addr_offs = $clog2(data_width / 8);
 
 reg cfg_now;            // pulse for configuration
 reg [3:0] cycle;        // each operation (config/read/write) are max 7 cycles
@@ -224,7 +224,7 @@ always @(posedge clk) begin
             SDRAM_A[10] <= 1'b1;        // set auto precharge
             SDRAM_A[9:0] <= {1'b0, addr_buf[COL_WIDTH-1 + addr_offs : addr_offs]};  // column address
             SDRAM_DQM <= 4'b0;
-            off <= addr_buf[1:0];
+            off <= addr_buf[0];
         end
         {READ, T_RCD+CAS}: begin
             data_ready <= 1'b1;
@@ -248,7 +248,7 @@ always @(posedge clk) begin
             SDRAM_A[10] <= 1'b1;        // set auto precharge
             SDRAM_A[9:0] <= {1'b0, addr_buf[COL_WIDTH - 1 + addr_offs : addr_offs]};  // column address
             SDRAM_DQM <= addr_buf[0] == 2'd0 ? 4'b1100 : 4'b0011;     // only write the correct word
-            off <= addr_buf[1:0];
+            off <= addr_buf[0];
             dq_out <= {din_buf,din_buf,din_buf,din_buf};
             dq_oen <= 1'b0;                 // DQ output on
             

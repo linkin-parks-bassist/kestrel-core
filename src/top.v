@@ -214,7 +214,7 @@ module top #(
 			.COL_WIDTH(8),
 			.BANK_WIDTH(2),  
 
-			.CAS(4'd4),     
+			.CAS(4'd3),     
 			.T_WR(4'd4),
 			.T_MRD(4'd4),
 			.T_RP(4'd2),
