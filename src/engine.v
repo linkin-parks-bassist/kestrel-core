@@ -6,7 +6,8 @@
 module dsp_engine #(
 		parameter n_blocks 			= 255,
 		parameter data_width 		= 16,
-		parameter spi_fifo_length	= 32
+		parameter spi_fifo_length	= 32,
+		parameter sdram_addr_width  = 22
 	) (
 		input wire clk,
 		input wire reset,
@@ -28,7 +29,17 @@ module dsp_engine #(
 
 		output wire [7:0] out,
 		
-		output wire [7:0] spi_byte_out
+		output wire [7:0] spi_byte_out,
+		
+		output wire sdram_read,
+		output wire sdram_write,
+		output wire sdram_refresh,
+		output wire [21 : 0] addr_to_sdram,
+		output wire [data_width - 1 : 0] data_to_sdram,
+		input  wire [data_width - 1 : 0] data_from_sdram,
+
+		input wire sdram_data_valid,
+		input wire sdram_busy
 	);
 
 	assign out = control_state;
@@ -47,7 +58,7 @@ module dsp_engine #(
 	wire [7:0] byte_probe_a;
 	wire [7:0] byte_probe_b;
 	
-	dsp_pipeline #(.data_width(data_width), .n_blocks(n_blocks)) pipeline_a (
+	dsp_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .sdram_addr_width(sdram_addr_width)) pipeline_a (
 		.clk(clk),
 		.reset(reset | pipeline_a_reset),
 		
@@ -94,10 +105,21 @@ module dsp_engine #(
 		
 		.resetting(pipeline_a_resetting),
 		
-		.byte_probe(byte_probe_a)
+		.byte_probe(byte_probe_a),
+		
+		.sdram_req(pipeline_sdram_reqs[0]),
+		.sdram_req_type(pipeline_sdram_req_types[0]),
+		
+		.sdram_write_ack(sdram_write_ack[0]),
+		.sdram_read_valid(sdram_read_valid[0]),
+
+		.sdram_addr(pipeline_a_sdram_addr),
+		.sdram_data_out(pipeline_a_sdram_data),
+		
+		.sdram_data_in(sdram_data_in)
 	);
 	
-	dsp_pipeline #(.data_width(data_width), .n_blocks(n_blocks)) pipeline_b (
+	dsp_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .sdram_addr_width(sdram_addr_width)) pipeline_b (
 		.clk(clk),
 		.reset(reset | pipeline_b_reset),
 		
@@ -143,7 +165,18 @@ module dsp_engine #(
 		
 		.resetting(pipeline_b_resetting),
 		
-		.byte_probe(byte_probe_b)
+		.byte_probe(byte_probe_b),
+		
+		.sdram_req(pipeline_sdram_reqs[1]),
+		.sdram_req_type(pipeline_sdram_req_types[1]),
+		
+		.sdram_write_ack(sdram_write_ack[1]),
+		.sdram_read_valid(sdram_read_valid[1]),
+
+		.sdram_addr(pipeline_b_sdram_addr),
+		.sdram_data_out(pipeline_b_sdram_data),
+		
+		.sdram_data_in(sdram_data_in)
 	);
 	
 	/**********************************************************/
@@ -306,6 +339,62 @@ module dsp_engine #(
 		
 		.spi_byte_out(spi_byte_out)
 	);
+	
+	wire pipeline_a_sdram_reqs;
+	wire pipeline_a_sdram_req_types;
+	
+	wire [sdram_addr_width - 2 : 0] pipeline_a_sdram_addr;
+	wire [data_width       - 1 : 0] pipeline_a_sdram_data;
+	
+	wire pipeline_b_sdram_reqs;
+	wire pipeline_b_sdram_req_types;
+	
+	wire [sdram_addr_width - 2 : 0] pipeline_b_sdram_addr;
+	wire [data_width       - 1 : 0] pipeline_b_sdram_data;
+	
+	wire [1:0] pipeline_sdram_reqs;
+	wire [1:0] pipeline_sdram_req_types;
+	
+	wire [1:0] sdram_write_ack;
+	wire [1:0] sdram_read_valid;
+	
+	wire [sdram_addr_width - 2 : 0] pipeline_sdram_addr [1:0];
+	
+	assign pipeline_sdram_addr[0] = pipeline_a_sdram_addr;
+	assign pipeline_sdram_addr[1] = pipeline_b_sdram_addr;
+	
+	wire [data_width - 1 : 0] pipeline_sdram_data [1:0];
+	
+	assign pipeline_sdram_data[0] = pipeline_a_sdram_data;
+	assign pipeline_sdram_data[1] = pipeline_b_sdram_data;
+	
+	wire [data_width - 1 : 0] sdram_data_in;
+	
+	sdram_interface #(.data_width(data_width), .addr_width(sdram_addr_width)) sdram_int
+		(
+			.clk(clk),
+			.reset(reset),
+			
+			.req(pipeline_sdram_reqs),
+			.req_type(pipeline_sdram_req_types),
+			.write_ack(sdram_write_ack),
+			.read_valid(sdram_read_valid),
+			
+			.addr_in(pipeline_sdram_addr),
+			.data_in(pipeline_sdram_data),
+			
+			.data_out(sdram_data_in),
+			
+			.controller_read(sdram_read),
+			.controller_write(sdram_write),
+			.refresh(sdram_refresh),
+			.addr_to_controller(addr_to_sdram),
+			.data_to_controller(data_to_sdram),
+			.data_from_controller(data_from_sdram),
+			
+			.data_from_controller_valid(sdram_data_valid),
+			.controller_busy(sdram_busy)
+		);
 	
 	/*******/
 	/* FSM */

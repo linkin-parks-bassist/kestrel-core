@@ -30,7 +30,19 @@ module top #(
 		input  wire i2s_din,
 		output wire i2s_dout,
 
-		output wire codec_en
+		output wire codec_en,
+		
+		// "Magic" port names that the gowin compiler connects to the on-chip SDRAM
+		output O_sdram_clk,
+		output O_sdram_cke,
+		output O_sdram_cs_n,            // chip select
+		output O_sdram_cas_n,           // columns address select
+		output O_sdram_ras_n,           // row address select
+		output O_sdram_wen_n,           // write enable
+		inout [31:0] IO_sdram_dq,       // 32 bit bidirectional data bus
+		output [10:0] O_sdram_addr,     // 11 bit multiplexed address bus
+		output [1:0] O_sdram_ba,        // two banks
+		output [3:0] O_sdram_dqm        // 32/4
 	);
 	
 	/**********/
@@ -56,7 +68,17 @@ module top #(
 		.current_pipeline(current_pipeline),
 		
 		.out(out),
-		.spi_byte_out(spi_byte_out)
+		.spi_byte_out(spi_byte_out),
+
+		.sdram_read(sdram_read),
+		.sdram_write(sdram_write),
+		.sdram_refresh(sdram_refresh),
+		.addr_to_sdram(addr_to_sdram),
+		.data_to_sdram(data_to_sdram),
+		.data_from_sdram(data_from_sdram),
+
+		.sdram_data_valid(sdram_data_valid),
+		.sdram_busy(sdram_busy)
 	);
 	
 	wire [7:0] out;
@@ -170,6 +192,61 @@ module top #(
 			end
 		end   
 	end
+	
+	wire clk_sdram;
+	
+	wire sdram_read;
+	wire sdram_write;
+	wire sdram_refresh;
+	wire [21 : 0] addr_to_sdram;
+	wire [data_width - 1 : 0] data_to_sdram;
+	wire [data_width - 1 : 0] data_from_sdram;
+
+	wire sdram_data_valid;
+	wire sdram_busy;
+	
+	sdram  #(
+			.data_width(data_width),
+			
+			.FREQ(112_500_000),
+			
+			.ROW_WIDTH(11),
+			.COL_WIDTH(8),
+			.BANK_WIDTH(2),  
+
+			.CAS(4'd4),     
+			.T_WR(4'd4),
+			.T_MRD(4'd4),
+			.T_RP(4'd2),
+			.T_RCD(4'd2),
+			.T_RC(4'd8)
+		)
+		sdram_controller
+		(
+			.SDRAM_DQ(IO_sdram_dq),     // 32 bit bidirectional data bus
+			.SDRAM_A(O_sdram_addr),     // 11 bit multiplexed address bus
+			.SDRAM_BA(O_sdram_ba),      // 4 banks
+			.SDRAM_nCS(O_sdram_cs_n),   // a single chip select
+			.SDRAM_nWE(O_sdram_wen_n),  // write enable
+			.SDRAM_nRAS(O_sdram_ras_n), // row address select
+			.SDRAM_nCAS(O_sdram_cas_n), // columns address select
+			.SDRAM_CLK(O_sdram_clk),
+			.SDRAM_CKE(O_sdram_cke),
+			.SDRAM_DQM(O_sdram_dqm),
+			
+			.clk(sys_clk),
+			.clk_sdram(clk_sdram),
+			.resetn(~reset),
+			.rd(sdram_read),
+			.wr(sdram_write),
+			.refresh(sdram_refresh),
+			.addr(addr_to_sdram),
+			.din(data_to_sdram),
+			.dout(data_from_sdram),
+			.dout32(),
+			.data_ready(sdram_data_valid),
+			.busy(sdram_busy)
+		);
 endmodule
 
 `default_nettype wire

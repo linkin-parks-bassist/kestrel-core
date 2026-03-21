@@ -11,7 +11,8 @@
 module dsp_pipeline #(
 		parameter data_width 		= 16,
 		parameter filter_width		= 18,
-		parameter n_blocks 			= 256
+		parameter n_blocks 			= 256,
+		parameter sdram_addr_width  = 22
 	) (
 		input wire clk,
 		input wire reset,
@@ -64,7 +65,18 @@ module dsp_pipeline #(
 
 		output wire [$clog2(n_blocks) - 1 : 0] n_blocks_running,
 		output wire [31:0] commits_accepted,
-		output wire [ 7:0] byte_probe
+		output wire [ 7:0] byte_probe,
+		
+		output wire sdram_req,
+		output wire sdram_req_type,
+
+		input wire sdram_write_ack,
+		input wire sdram_read_valid,
+
+		output wire [sdram_addr_width - 2 : 0] sdram_addr,
+		output wire [data_width - 1 : 0] sdram_data_out,
+
+		input wire [data_width - 1 : 0] sdram_data_in
 	);
 
     assign byte_probe = core_out;
@@ -150,21 +162,29 @@ module dsp_pipeline #(
 	);
 	
 	// Delay buffers
-	localparam delay_mem_size = 16384;
-	localparam delay_mem_addr_width = $clog2(delay_mem_size);
-	reg [data_width - 1 : 0] delay_mem [delay_mem_size - 1 : 0];
+	localparam delay_mem_addr_width = sdram_addr_width;
+	localparam delay_mem_size = (1 << (delay_mem_addr_width - 1));
+	//reg [data_width - 1 : 0] delay_mem [delay_mem_size - 1 : 0];
+
+	assign sdram_req = delay_mem_read_req | delay_mem_write_req;
+	assign sdram_req_type = delay_mem_write_req;
+
+	assign delay_mem_write_ack = sdram_write_ack;
+	assign delay_mem_read_valid = sdram_read_valid;
+
+	assign sdram_addr = delay_mem_write_req ? delay_mem_write_addr : delay_mem_read_addr;
 	
 	wire delay_mem_read_req;
-	reg  delay_mem_read_wait;
+	//reg  delay_mem_read_wait;
 	wire delay_mem_write_req;
 	
-	reg delay_mem_write_cooldown;
-	reg delay_mem_write_enable;
+	//reg delay_mem_write_cooldown;
+	//reg delay_mem_write_enable;
 	
-	reg [delay_mem_addr_width - 1 : 0] delay_mem_write_addr_r;
-	reg [data_width 		  - 1 : 0] delay_mem_write_data_r;
+	//reg [delay_mem_addr_width - 1 : 0] delay_mem_write_addr_r;
+	//reg [data_width 		  - 1 : 0] delay_mem_write_data_r;
 	
-	always @(posedge clk) begin
+	/*always @(posedge clk) begin
 		delay_mem_write_ack <= 0;
 		delay_mem_read_valid <= 0;
 		delay_mem_write_enable <= 0;
@@ -193,7 +213,7 @@ module dsp_pipeline #(
 			delay_mem_data_out_r <= delay_mem_data_out;
 			delay_mem_read_valid <= 1;
 		end
-	end
+	end*/
 	
 	wire [delay_mem_addr_width - 1 : 0] delay_mem_read_addr;
 	reg  signed    [data_width - 1 : 0] delay_mem_data_out;
@@ -203,7 +223,7 @@ module dsp_pipeline #(
 	wire signed    [data_width - 1 : 0] delay_mem_data_in;
 	
 	reg delay_mem_read_valid;
-	reg delay_mem_write_ack;
+	wire delay_mem_write_ack;
 	
     wire any_delay_buffers;
 
@@ -251,13 +271,13 @@ module dsp_pipeline #(
 		.mem_write_req(delay_mem_write_req),
 		
 		.mem_read_addr(delay_mem_read_addr),
-		.mem_data_in  (delay_mem_data_out_r),
+		.mem_data_in  (sdram_data_in),
 		
 		.mem_write_addr(delay_mem_write_addr),
-		.mem_data_out  (delay_mem_data_in),
+		.mem_data_out  (sdram_data_out),
 		
-		.mem_read_valid(delay_mem_read_valid),
-		.mem_write_ack (delay_mem_write_ack),
+		.mem_read_valid(sdram_read_valid),
+		.mem_write_ack (sdram_write_ack),
 
         .any_buffers(any_delay_buffers)
 	);

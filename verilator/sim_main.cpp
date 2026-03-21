@@ -250,24 +250,17 @@ int main(int argc, char** argv)
 	printf("Starting...\n");
 	
 	printf("Load low pass filter...\n");
-	kest_effect_desc *lpf_desc = kest_read_eff_desc_from_file("eff/LPF.EFF");
+	kest_effect_desc *test_desc = kest_read_eff_desc_from_file("eff/del.eff");
 	
-	if (!lpf_desc)
+	if (!test_desc)
 	{
 		printf("Failed.\n");
 		abort();
 	}
 	
-	kest_effect delay_effect;
-	kest_effect gain_effect;
-	kest_effect lpf_effect;
-	kest_effect lpf_effect2;
-	kest_effect hpf_effect;
-	kest_effect bpf_effect;
-	kest_effect bsf_effect;
+	kest_effect test_effect;
 	
-	if (lpf_desc)   init_effect_from_effect_desc(&lpf_effect, lpf_desc);
-	if (lpf_desc)   init_effect_from_effect_desc(&lpf_effect2, lpf_desc);
+	if (test_desc)   init_effect_from_effect_desc(&test_effect, test_desc);
 	
 	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
 	
@@ -276,137 +269,10 @@ int main(int argc, char** argv)
 	int pos = 0;
 
 	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
-	kest_fpga_batch_append_effect(&batch, &lpf_effect, &res, &pos);
-	//kest_fpga_batch_append_effect(&batch, &lpf_effect2, &res, &pos);
+	kest_fpga_batch_append_effect(&batch, &test_effect, &res, &pos);
 	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
 	
-	/*kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_BLOCK_INSTR);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append_32(&batch, BLOCK_INSTR_FILTER | (1 << 5));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_BLOCK_INSTR);
-	kest_fpga_batch_append(&batch, 1);
-	kest_fpga_batch_append_32(&batch, BLOCK_INSTR_FILTER | (1 << 5) | (1 << 20));
-	
-	
-	int format = 2;
-	
-	float cutoff = 440.0;
-	float Q = 0.707;
-	
-	float omega = 2.0 * M_PI * cutoff / 44100.0;
-	float alpha = sin(omega) / (2 * Q);
-	
-	float b0 = (1.0/2.0) * (1.0 - cos(omega)) / (1.0 + alpha);
-	float b1 =             (1.0 - cos(omega)) / (1.0 + alpha);
-	float b2 = (1.0/2.0) * (1.0 - cos(omega)) / (1.0 + alpha);
-	float a1 =             (2.0 * cos(omega)) / (1.0 + alpha);
-	float a2 =                  (alpha - 1.0) / (1.0 + alpha);
-	
-	kest_fpga_batch_append(&batch, COMMAND_ALLOC_FILTER);
-	kest_fpga_batch_append(&batch, format);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append(&batch, 3);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append(&batch, 2);
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0); kest_fpga_batch_append_16(&batch, 0);
-	kest_fpga_batch_append_24(&batch, roundf(b0 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0); kest_fpga_batch_append_16(&batch, 1);
-	kest_fpga_batch_append_24(&batch, roundf(b1 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0); kest_fpga_batch_append_16(&batch, 2);
-	kest_fpga_batch_append_24(&batch, roundf(b2 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0); kest_fpga_batch_append_16(&batch, 3);
-	kest_fpga_batch_append_24(&batch, roundf(a1 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0); kest_fpga_batch_append_16(&batch, 4);
-	kest_fpga_batch_append_24(&batch, roundf(a2 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_ALLOC_FILTER);
-	kest_fpga_batch_append(&batch, format);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append(&batch, 3);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append(&batch, 2);
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 1); kest_fpga_batch_append_16(&batch, 0);
-	kest_fpga_batch_append_24(&batch, roundf(b0 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 1); kest_fpga_batch_append_16(&batch, 1);
-	kest_fpga_batch_append_24(&batch, roundf(b1 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 1); kest_fpga_batch_append_16(&batch, 2);
-	kest_fpga_batch_append_24(&batch, roundf(b2 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 1); kest_fpga_batch_append_16(&batch, 3);
-	kest_fpga_batch_append_24(&batch, roundf(a1 * pow(2, 16 - format)));
-	
-	kest_fpga_batch_append(&batch, COMMAND_WRITE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 1); kest_fpga_batch_append_16(&batch, 4);
-	kest_fpga_batch_append_24(&batch, roundf(a2 * pow(2, 16 - format)));
-
-	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);*/
-	
-	append_send_queue(batch, 70);
-	float c;
-	int32_t s;
-	batch = kest_new_fpga_transfer_batch();
-	
-	kest_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append_16(&batch, 0);
-	c = 1.0;
-	s = float_to_q_nminus1_18bit(c, 1);
-	kest_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
-	
-	kest_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append_16(&batch, 1);
-	c = 0;
-	s = float_to_q_nminus1_18bit(c, 1);
-	kest_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
-	
-	kest_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append_16(&batch, 2);
-	c = 0;
-	s = float_to_q_nminus1_18bit(c, 1);
-	kest_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
-	
-	kest_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append_16(&batch, 3);
-	c = 0;
-	s = float_to_q_nminus1_18bit(c, 1);
-	kest_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
-	
-	kest_fpga_batch_append(&batch, COMMAND_UPDATE_FILTER_COEF);
-	kest_fpga_batch_append(&batch, 0);
-	kest_fpga_batch_append_16(&batch, 4);
-	c = 0;
-	s = float_to_q_nminus1_18bit(c, 1);
-	kest_fpga_batch_append_24(&batch, s & ((1u << 18) - 1));
-	
-	
-	kest_fpga_batch_append(&batch, COMMAND_COMMIT_FILTER_COEF);
-	
-	
-	append_send_queue(batch, 1024);
-	
+	append_send_queue(batch, 5);
 	
 	int samples_to_process = (n_samples < MAX_SAMPLES) ? n_samples : MAX_SAMPLES;
 	if (!use_wavs)
@@ -464,7 +330,7 @@ int main(int argc, char** argv)
 			samples_processed++;
 			t += sample_duration;
 			
-			io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1200.0f * t * ((float)samples_processed / (float)samples_to_process)) * 32767.0 * 0.5f));
+			io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1000.0f * t/* * ((float)samples_processed / (float)samples_to_process)*/) * 32767.0 * 0.5f));
 			//io.sample_in = static_cast<int16_t>(in_samples[samples_processed]);
 			
 			if (use_wavs)
