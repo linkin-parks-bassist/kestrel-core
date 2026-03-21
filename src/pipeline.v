@@ -124,6 +124,7 @@ module dsp_pipeline #(
 		.delay_write_data(delay_write_data),
 		.delay_write_inc (delay_write_inc),
 		.delay_read_data (delay_read_data),
+		.delay_read_delay(delay_read_delay),
 		.delay_read_valid(delay_read_valid),
 		.delay_write_ack (delay_write_ack),
 		
@@ -222,6 +223,8 @@ module dsp_pipeline #(
 	wire [delay_mem_addr_width - 1 : 0] delay_mem_write_addr;
 	wire signed    [data_width - 1 : 0] delay_mem_data_in;
 	
+	wire [data_width - 1 : 0] delay_read_delay;
+	
 	reg delay_mem_read_valid;
 	wire delay_mem_write_ack;
 	
@@ -259,6 +262,7 @@ module dsp_pipeline #(
 		
 		.write_handle(delay_req_handle),
 		.read_handle (delay_req_handle),
+		.read_delay	 (delay_read_delay),
 		.write_data  (delay_write_data),
 		.write_inc   (delay_write_inc),
 			

@@ -68,6 +68,7 @@ module instr_decoder #(parameter data_width = 16)
 						|| operation == `BLOCK_INSTR_UMACZ
 						|| operation == `BLOCK_INSTR_UMAC
 						|| operation == `BLOCK_INSTR_LUT_READ
+						|| operation == `BLOCK_INSTR_DELAY_READ
 						|| operation == `BLOCK_INSTR_DELAY_WRITE
 						|| operation == `BLOCK_INSTR_MEM_WRITE
 						|| operation == `BLOCK_INSTR_FILTER);

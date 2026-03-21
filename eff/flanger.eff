@@ -1,0 +1,53 @@
+v1.0
+
+.INFO
+
+name: "Delay"
+cname: "delay"
+
+.PARAMETERS
+
+speed: (name: "Speed", default: 20.0, min: 0, max: 4, units: " Hz")
+depth:  (name: "Depth", default: 2.5,  min: 0, max: 1.0, units: " ms")
+breadth: (name: "Breadth", default: 2.5, min: 0, max: 5, units: " ms")
+delay_gain: (name: "Strength", default: 0.5, min: 0, max: 1.0, group: 1)
+
+.SETTINGS
+
+
+.RESOURCES
+
+delay: (type: "delay", delay: 0, size: 5)
+lacc: (type: "mem")
+uacc: (type: "mem")
+
+.DEFS
+
+depth_samples: (sample_rate/1000) * depth
+breadth_samples: (sample_rate/1000) * breadth
+
+step: speed/sample_rate
+
+.CODE
+
+mem_read $uacc c1
+mem_read $lacc c2
+
+umacz c1        [2.0]
+umac  c2        [2^(-15)]
+umac  [sqrt(step)] [2.0*sqrt(step)]
+
+mov_uacc  c1
+mov_lacc  c2
+mem_write c1 $uacc
+mem_write c2 $lacc
+
+mov_uacc c3
+
+sin2pi c3 c4
+
+madd c4 [2^(-8) * breadth_samples] [2^(-8) * depth_samples] c6
+
+delay_read $delay c6 c7
+madd c7 [delay_gain] c0 c0
+delay_mwrite c0 c6 $delay
