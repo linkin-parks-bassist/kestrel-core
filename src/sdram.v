@@ -107,7 +107,7 @@ reg  [data_width - 1 : 0] dout_buf;
 `ifdef verilator
 wire [data_width - 1 : 0] next_dout =  sim_mem_read_val;
 `else
-wire [data_width - 1 : 0] next_dout =  off ? dq_in[data_width - 1 : 0] : dq_in[2 * data_width - 1 : data_width];
+wire [data_width - 1 : 0] next_dout =  off ? dq_in[2 * data_width - 1 : data_width] : dq_in[data_width - 1 : 0];
 `endif
 assign dout = data_ready ? next_dout : dout_buf;
 assign dout32 = dq_in;
