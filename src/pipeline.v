@@ -176,49 +176,9 @@ module dsp_pipeline #(
 	assign sdram_addr = delay_mem_write_req ? delay_mem_write_addr : delay_mem_read_addr;
 	
 	wire delay_mem_read_req;
-	//reg  delay_mem_read_wait;
 	wire delay_mem_write_req;
 	
-	//reg delay_mem_write_cooldown;
-	//reg delay_mem_write_enable;
-	
-	//reg [delay_mem_addr_width - 1 : 0] delay_mem_write_addr_r;
-	//reg [data_width 		  - 1 : 0] delay_mem_write_data_r;
-	
-	/*always @(posedge clk) begin
-		delay_mem_write_ack <= 0;
-		delay_mem_read_valid <= 0;
-		delay_mem_write_enable <= 0;
-		delay_mem_write_cooldown <= 0;
-		
-		delay_mem_read_wait <= 0;
-		
-		delay_mem_data_out <= delay_mem[delay_mem_read_addr];
-		
-		if (!delay_mem_write_cooldown && delay_mem_write_req) begin
-			delay_mem_write_addr_r <= delay_mem_write_addr;
-			delay_mem_write_data_r <= delay_mem_data_in;
-			delay_mem_write_cooldown <= 1;
-			delay_mem_write_enable <= 1;
-			delay_mem_write_ack <= 1;
-		end
-		
-		if (delay_mem_write_enable)
-			delay_mem[delay_mem_write_addr_r] <= delay_mem_write_data_r;
-		
-		if (!delay_mem_read_wait && delay_mem_read_req) begin
-			delay_mem_read_wait <= 1;
-		end
-		
-		if (delay_mem_read_wait) begin
-			delay_mem_data_out_r <= delay_mem_data_out;
-			delay_mem_read_valid <= 1;
-		end
-	end*/
-	
 	wire [delay_mem_addr_width - 1 : 0] delay_mem_read_addr;
-	reg  signed    [data_width - 1 : 0] delay_mem_data_out;
-	reg  signed    [data_width - 1 : 0] delay_mem_data_out_r;
 	
 	wire [delay_mem_addr_width - 1 : 0] delay_mem_write_addr;
 	wire signed    [data_width - 1 : 0] delay_mem_data_in;

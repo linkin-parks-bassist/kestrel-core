@@ -117,6 +117,7 @@ module sdram_interface #(parameter data_width = 16, parameter addr_width = 22)
 					
 					next_priority <= ~next_priority;
 					write_wait <= 1;
+					wait_one <= 1;
 				end else if (!cooldowns[{next_priority, 0}]) begin //read
 					controller_read <= 1;
 					client <= next_priority;

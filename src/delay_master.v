@@ -2,7 +2,7 @@
 
 module delay_master #(parameter data_width  = 16,
 					  parameter n_buffers   = 32,
-					  parameter memory_size = 8192)
+					  parameter memory_size = 2097152)
 	(
 		input wire clk,
 		input wire reset,
@@ -46,10 +46,9 @@ module delay_master #(parameter data_width  = 16,
 		output wire any_buffers
 	);
 	
-	localparam DELAY_FORMAT = 8;
 	
 	localparam addr_width   = $clog2(memory_size);
-	localparam delay_width  = addr_width + DELAY_FORMAT;
+	localparam delay_width  = addr_width;
 	localparam handle_width = $clog2(n_buffers);
 	
 	assign any_buffers = |n_buffers_allocd;
@@ -110,16 +109,10 @@ module delay_master #(parameter data_width  = 16,
 	
 	reg [addr_width - 1 : 0] alloc_addr;
 	
-	wire [data_width - DELAY_FORMAT - 1 : 0] delay_addr_delta = delay[data_width - 1 : addr_width - DELAY_FORMAT];
+	wire [addr_width - 1 : 0] delay_addr_delta = delay;
 	wire [addr_width - 1 : 0] delay_addr = (delay_addr_delta > position) ? addr + position - delay_addr_delta + size
 																		 : addr + position - delay_addr_delta;
-	
-	reg [addr_width + DELAY_FORMAT - 1 : 0] write_inc_clamped;
-	
-	wire 		[addr_width + DELAY_FORMAT - 1 : 0] max_delay 	   = (size << DELAY_FORMAT);
-	wire signed [addr_width + DELAY_FORMAT - 1 : 0] max_delay_inc = max_delay - delay;
-	wire signed [addr_width + DELAY_FORMAT - 1 : 0] min_delay_inc = -delay;
-	
+		
 	reg [$clog2(n_buffers + 1) - 1 : 0] n_buffers_allocd;
 	
 	wire buffers_exhausted 	= (n_buffers_allocd == n_buffers);
@@ -184,11 +177,6 @@ module delay_master #(parameter data_width  = 16,
 				
 				buf_info_write_handle <= n_buffers_allocd;
 				buf_info_write_enable <= 1;
-				
-				// Clear the buffer's output slot
-				buf_data_new <= 0;
-				write_handle_r <= n_buffers_allocd;
-				buf_data_write_enable <= 1;
 			end
 		end else if (enable) begin
 			case (state)
@@ -222,9 +210,9 @@ module delay_master #(parameter data_width  = 16,
 				end
 				
 				READ_3: begin
-                    if (req_delay_offset <= -delay)
+                    if ($signed(delay) + req_delay_offset < 1)
                         delay <= 1;
-                    else if (delay + req_delay_offset > size - 1)
+                    else if (delay + req_delay_offset > (size - 1))
                         delay <= size - 1;
                     else
                         delay <= $unsigned($signed(delay) + req_delay_offset);
@@ -251,7 +239,7 @@ module delay_master #(parameter data_width  = 16,
 				end
 				
 				READ_7: begin
-					data_out 	<= product_r >>> (data_width - 1);
+					data_out 	<= product_r >>> (data_width - 2);
 					read_valid  <= 1;
 					state 		<= IDLE;
 					read_wait_one <= 1;
