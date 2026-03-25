@@ -166,7 +166,7 @@ module dsp_pipeline #(
 	
 	// Delay buffers
 	localparam delay_mem_addr_width = sdram_addr_width;
-	localparam delay_mem_size = (1 << (delay_mem_addr_width - 1));
+	localparam delay_mem_size = (1 << (delay_mem_addr_width));
 	//reg [data_width - 1 : 0] delay_mem [delay_mem_size - 1 : 0];
 
 	assign sdram_req = delay_mem_read_req | delay_mem_write_req;
