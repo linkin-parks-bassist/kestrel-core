@@ -27,13 +27,11 @@ module delay_master #(parameter data_width  = 16,
 		input wire [	addr_width - 1 : 0] alloc_size,
 		input wire [2 * data_width - 1 : 0] alloc_delay,
 		
-		output reg mem_read_req,
-		output reg mem_write_req,
+		output reg mem_req,
+		output reg mem_req_type,
 		
-		output reg 		  [addr_width - 1 : 0] mem_read_addr,
+		output reg 		  [addr_width - 1 : 0] mem_addr,
 		input wire signed [data_width - 1 : 0] mem_data_in,
-		
-		output reg [addr_width - 1 : 0] mem_write_addr,
 		output reg signed [data_width - 1 : 0] mem_data_out,
 		
 		input wire mem_read_valid,
@@ -176,8 +174,7 @@ module delay_master #(parameter data_width  = 16,
 			alloc_addr <= 0;
 			read_wait <= 0;
 			
-			mem_read_req <= 0;
-			mem_write_req <= 0;
+			mem_req <= 0;
 		end else if (alloc_req_r) begin
 			if (alloc_too_big || buffers_exhausted) begin
 				invalid_alloc <= 1;
@@ -235,8 +232,9 @@ module delay_master #(parameter data_width  = 16,
 				end
 				
 				READ_4: begin
-					mem_read_addr <= delay_addr;
-					mem_read_req  <= 1;
+					mem_addr <= delay_addr;
+					mem_req  <= 1;
+                    mem_req_type <= 0;
 					
 					state <= READ_5;
 				end
@@ -248,7 +246,7 @@ module delay_master #(parameter data_width  = 16,
 				READ_6: begin
 					if (mem_read_valid) begin
 						product_r 		<= product;
-						mem_read_req 	<= 0;
+						mem_req 	    <= 0;
 						state 			<= READ_7;
 					end
 				end
@@ -270,9 +268,11 @@ module delay_master #(parameter data_width  = 16,
 				end
 				
 				WRITE_3: begin
-					mem_data_out   <= write_data_r;
-					mem_write_addr <= addr + position;
-					mem_write_req  <= 1;
+					mem_data_out  <= write_data_r;
+					mem_addr      <= addr + position;
+					
+					mem_req      <= 1;
+                    mem_req_type <= 1;
 					
 					state <= WRITE_4;
 				end
@@ -292,7 +292,7 @@ module delay_master #(parameter data_width  = 16,
 				end
 				WRITE_5: begin
 					if (mem_write_ack) begin
-						mem_write_req <= 0;
+						mem_req <= 0;
 						buf_info_write_data <= {addr, size, delay, position, gain, wrapped};
 						buf_info_write_handle <= write_handle_r;
 						buf_info_write_enable  <= 1;

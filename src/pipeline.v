@@ -167,43 +167,13 @@ module dsp_pipeline #(
 	// Delay buffers
 	localparam delay_mem_addr_width = sdram_addr_width;
 	localparam delay_mem_size = (1 << (delay_mem_addr_width));
+<<<<<<< Updated upstream
 	//reg [data_width - 1 : 0] delay_mem [delay_mem_size - 1 : 0];
+=======
+>>>>>>> Stashed changes
 
-	assign sdram_req = delay_mem_read_req | delay_mem_write_req;
-	assign sdram_req_type = delay_mem_write_req;
-
-	assign delay_mem_write_ack = sdram_write_ack;
-	assign delay_mem_read_valid = sdram_read_valid;
-
-	assign sdram_addr = delay_mem_write_req ? delay_mem_write_addr : delay_mem_read_addr;
-	
-	wire delay_mem_read_req;
-	wire delay_mem_write_req;
-	
-	wire [delay_mem_addr_width - 1 : 0] delay_mem_read_addr;
-	
-	wire [delay_mem_addr_width - 1 : 0] delay_mem_write_addr;
-	wire signed    [data_width - 1 : 0] delay_mem_data_in;
-	
-	wire [data_width - 1 : 0] delay_read_delay;
-	
-	reg delay_mem_read_valid;
-	wire delay_mem_write_ack;
-	
+    wire [data_width - 1 : 0] delay_read_delay;
     wire any_delay_buffers;
-
-    reg any_delay_mem_reqs;
-    reg any_delay_reqs;
-
-    always @(posedge clk) begin
-        if (reset | full_reset) begin
-            any_delay_mem_reqs <= 0;
-            any_delay_reqs <= 0;
-        end else if (enable) begin
-            any_delay_mem_reqs <= any_delay_mem_reqs | delay_mem_read_req | delay_mem_write_req;
-            any_delay_reqs <= any_delay_reqs | delay_read_req | delay_write_req;
-        end
-    end
 
 	delay_master #(
 		.data_width(data_width), 
@@ -233,13 +203,12 @@ module dsp_pipeline #(
 		.read_valid(delay_read_valid),
 		.write_ack(delay_write_ack),
 		
-		.mem_read_req (delay_mem_read_req),
-		.mem_write_req(delay_mem_write_req),
+		.mem_req (sdram_req),
+		.mem_req_type(sdram_req_type),
 		
-		.mem_read_addr(delay_mem_read_addr),
-		.mem_data_in  (sdram_data_in),
+		.mem_addr(sdram_addr),
+		.mem_data_in(sdram_data_in),
 		
-		.mem_write_addr(delay_mem_write_addr),
 		.mem_data_out  (sdram_data_out),
 		
 		.mem_read_valid(sdram_read_valid),
