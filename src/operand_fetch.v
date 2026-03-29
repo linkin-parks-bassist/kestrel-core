@@ -108,7 +108,10 @@ module operand_fetch_substage #(parameter data_width = 16, parameter n_blocks = 
 		input wire signed [data_width - 1 : 0] channel_write_val,
 		input wire channel_write_enable,
 		
-		input wire accumulator_write_enable
+		input wire accumulator_write_enable,
+		
+		input wire [3:0] flags_in,
+		output reg [3:0] flags_out
 	);
 	
 	reg [data_width - 1 : 0] channels [15 : 0];
@@ -292,6 +295,8 @@ module operand_fetch_substage #(parameter data_width = 16, parameter n_blocks = 
 	reg commit_flag_latched;
 	
 	reg [$clog2(`N_MISC_OPS) - 1 : 0] misc_op_latched;
+	
+	reg [3:0] flags_latched;
 
 	wire  [3 : 0] arg_pending_writes = channels_scoreboard[src_latched];
 	
@@ -419,6 +424,8 @@ module operand_fetch_substage #(parameter data_width = 16, parameter n_blocks = 
 					src_c_reg_out 		<= src_c_reg_in;
 					arg_c_out 			<= arg_c_in;
 					
+					flags_out			<= flags_in;
+					
 					branch_out <= branch_in;
 					
 					out_valid <= 1;
@@ -477,6 +484,8 @@ module operand_fetch_substage #(parameter data_width = 16, parameter n_blocks = 
 					src_c_reg_latched		<= src_c_reg_in;
 					arg_c_latched 			<= arg_c_in;
 					
+					flags_latched 			<= flags_in;
+					
 					out_valid <= ~out_ready;
 					busy <= 1;
 				end
@@ -523,6 +532,8 @@ module operand_fetch_substage #(parameter data_width = 16, parameter n_blocks = 
 					writes_channel_out   	<= writes_channel_latched;
 					writes_external_out  	<= writes_external_latched;
 					writes_accumulator_out 	<= writes_accumulator_latched;
+					
+					flags_out <= flags_latched;
 					
 					branch_out <= branch_latched;
 					
@@ -627,7 +638,10 @@ module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256
 		
 		input  wire signed [data_width - 1 : 0] channel_read_val,
 		
-		input  wire accumulator_write_enable
+		input  wire accumulator_write_enable,
+		
+		input  wire [3:0] flags_in,
+		output wire [3:0] flags_out
 	);
 	
 	wire out_valid_1;
@@ -666,6 +680,7 @@ module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_1_out;
 	wire commit_flag_1_out;
 	wire [`N_INSTR_BRANCHES - 1 : 0] branch_1_out;
+	wire [3:0] flags_1_out;
 	
 	operand_fetch_substage #(.data_width(data_width), .n_blocks(n_blocks), .last(0)) fetch_1
 	(
@@ -808,6 +823,7 @@ module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_2_out;
 	wire commit_flag_2_out;
 	wire [`N_INSTR_BRANCHES - 1 : 0] branch_2_out;
+	wire [3:0] flags_2_out;
 	
 	operand_fetch_substage #(.data_width(data_width), .n_blocks(n_blocks), .last(0)) fetch_2
 	(
@@ -947,6 +963,7 @@ module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_3_out;
 	wire commit_flag_3_out;
 	wire [`N_INSTR_BRANCHES - 1 : 0] branch_3_out;
+	wire [3:0] flags_3_out;
 
 	operand_fetch_substage #(.data_width(data_width), .n_blocks(n_blocks), .last(1)) fetch_3
 	(
@@ -1052,7 +1069,7 @@ module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256
 	);
 	
 	localparam payload_width = 
-		$clog2(n_blocks)+data_width+data_width+5+$clog2(`N_MISC_OPS)+4+data_width+data_width+data_width+1+1+5+1+8+1+1+1+$clog2(`N_INSTR_BRANCHES)+6;
+		$clog2(n_blocks)+data_width+data_width+5+$clog2(`N_MISC_OPS)+4+data_width+data_width+data_width+1+1+5+1+8+1+1+1+$clog2(`N_INSTR_BRANCHES)+6+3;
 	
 	wire in_ready_skid;
 	
@@ -1075,7 +1092,8 @@ module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256
 			writes_external_3_out,
 			commit_id_3_out,
 			commit_flag_3_out,
-			branch_3_out
+			branch_3_out,
+			flags_3_out
 		};
 	wire [payload_width - 1 : 0] skid_buffer_payload_out;
 	
@@ -1097,7 +1115,8 @@ module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256
 			writes_external_out,
 			commit_id_out,
 			commit_flag_out,
-			branch_out
+			branch_out,
+			flags_3_out
 		} = skid_buffer_payload_out;
 	
 	skid_buffer #(.payload_width(payload_width)) skidder

@@ -19,6 +19,8 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 		input wire [$clog2(n_blocks) - 1 : 0] block_in,
 		output reg [$clog2(n_blocks) - 1 : 0] block_out,
 		
+		output reg [data_width - 1 : 0] req_id_out,
+		
 		input wire write,
 		
 		input wire [handle_width - 1 : 0] handle_in,
@@ -42,7 +44,10 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 		output reg signed [full_width - 1 : 0] result_out,
 		
 		input wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
-		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out
+		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
+		
+		input wire [3:0] flags_in,
+		output reg [3:0] flags_out
 	);
 	
 	localparam IDLE = 2'd0;
@@ -60,6 +65,8 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 	reg [3:0] dest_latched;
 	reg write_latched;
 	reg [1:0] state;
+	
+	reg [3:0] flags_latched;
 	
 	always @(posedge clk) begin
 		if (reset) begin
@@ -81,6 +88,9 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 						
 						commit_id_latched <= commit_id_in;
 						block_latched <= block_in;
+						
+						req_id_out <= block_in;
+						flags_out <= flags_in;
 						
 						state <= REQ;
 					end

@@ -424,7 +424,9 @@ module dsp_core #(
 		.commit_flag_out(commit_flag_out_bfds),
 		.writes_external_out(writes_external_out_bfds),
 		
-		.branch_out(branch_out_bfds)
+		.branch_out(branch_out_bfds),
+		
+		.flags_out(flags_out_bfds)
 	);
 	
 	/***********************/
@@ -514,7 +516,10 @@ module dsp_core #(
 		.channel_write_val(channel_write_val),
 		.channel_write_enable(channel_write_enable),
 		
-		.accumulator_write_enable(accumulator_write_enable)
+		.accumulator_write_enable(accumulator_write_enable),
+		
+		.flags_in(flags_out_bfds),
+		.flags_out(flags_out_ofs)
 	);
 	
 	/*****************/
@@ -584,7 +589,10 @@ module dsp_core #(
 		.accumulator_in(accumulator),
 		.accumulator_out(accumulator_out_router),
 		
-		.branch(branch_out_ofs)
+		.branch(branch_out_ofs),
+		
+		.flags_in(flags_out_ofs),
+		.flags_out(flags_out_router)
 	);
 
 	/**************************/
@@ -753,7 +761,10 @@ module dsp_core #(
 		.result_out(result_final_stages[`INSTR_BRANCH_DELAY]),
 		
 		.commit_id_in (commit_id_out_router),
-		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_DELAY])
+		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_DELAY]),
+		
+		.flags_in(flags_out_router),
+		.flags_out(flags_out_delay)
 	);
 
 	/********/
@@ -798,7 +809,10 @@ module dsp_core #(
 		.result_out(result_final_stages[`INSTR_BRANCH_LUT]),
 		
 		.commit_id_in(commit_id_out_router),
-		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_LUT])
+		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_LUT]),
+		
+		.flags_in(flags_out_router),
+		.flags_out(flags_out_lut)
 	);
 	
 	/**********/
@@ -845,7 +859,10 @@ module dsp_core #(
 		.result_out(result_final_stages[`INSTR_BRANCH_MEM]),
 		
 		.commit_id_in(commit_id_out_router),
-		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_MEM])
+		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_MEM]),
+		
+		.flags_in(flags_out_router),
+		.flags_out(flags_out_mem)
 	);
 	
 	/**********/
@@ -892,7 +909,10 @@ module dsp_core #(
 		.result_out(result_final_stages[`INSTR_BRANCH_FILT]),
 		
 		.commit_id_in(commit_id_out_router),
-		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_FILT])
+		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_FILT]),
+		
+		.flags_in(flags_out_router),
+		.flags_out(flags_out_filter)
 	);
 	
 	/*****************/
@@ -991,6 +1011,7 @@ module dsp_core #(
 	wire commit_flag_out_bfds;
 	wire writes_external_out_bfds;
 	wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_out_bfds;
+	wire [3:0] flags_out_bfds;
 	
 	// Operand fetch stage
 	wire out_ready_ofs;
@@ -1014,6 +1035,7 @@ module dsp_core #(
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_ofs;
 	wire commit_flag_out_ofs;
 	wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_out_ofs;
+	wire [3:0] flags_out_ofs;
 	
 	// Branch Router
 	wire in_ready_router;
@@ -1034,6 +1056,7 @@ module dsp_core #(
 	wire shift_disable_out_router;
 	wire [7 : 0] res_addr_out_router;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_router;
+	wire [3:0] flags_out_router;
 	wire commit_flag_out_router;
 	wire signed [full_width - 1 : 0] accumulator_out_router;
 	assign out_ready_router[0] = in_ready_madd;
@@ -1058,6 +1081,7 @@ module dsp_core #(
 	wire [data_width - 1 : 0] arg_b_out_delay;
 	wire [full_width - 1 : 0] result_out_delay;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_delay;
+	wire [3:0] flags_out_delay;
 	
 	
 	// LUT Branch
@@ -1065,6 +1089,7 @@ module dsp_core #(
 	wire [data_width - 1 : 0] arg_a_out_lut;
 	wire [data_width - 1 : 0] arg_b_out_lut;
 	wire [full_width - 1 : 0] result_out_lut;
+	wire [3:0] flags_out_lut;
 	
 	// Memory branch
 	wire [data_width   - 1 : 0] arg_a_out_mem;
@@ -1076,9 +1101,11 @@ module dsp_core #(
 	wire mem_write_req;
 	wire mem_write_ack = 1;
 	wire in_ready_mem;
+	wire [3:0] flags_out_mem;
 	
 	// Filter branch
 	wire in_ready_filt;
+	wire [3:0] flags_out_filter;
 	
 	// Later (when there are more cores) the memory will be moved
 	// outside for shared access & arbitration. For now,

@@ -67,7 +67,10 @@ module branch_router #(parameter data_width = 16, parameter n_blocks = 256, para
 		input wire signed [full_width - 1 : 0] accumulator_in,
 		output reg signed [full_width - 1 : 0] accumulator_out,
 
-		input wire [`N_INSTR_BRANCHES - 1 : 0] branch
+		input wire [`N_INSTR_BRANCHES - 1 : 0] branch,
+		
+		input wire [3:0] flags_in,
+		output reg [3:0] flags_out
 	);
 	
 	reg [`N_INSTR_BRANCHES - 1 : 0] branch_out;
@@ -76,7 +79,6 @@ module branch_router #(parameter data_width = 16, parameter n_blocks = 256, para
 	
 	wire take_in  = in_ready & in_valid;
 	wire take_out = out_valid[branch_out] & out_ready[branch_out];
-	
 	
 	always @(posedge clk) begin
 		if (reset) begin
@@ -107,6 +109,8 @@ module branch_router #(parameter data_width = 16, parameter n_blocks = 256, para
 				commit_id_out <= commit_id_in;
 				commit_flag_out <= commit_flag_in;
 				accumulator_out <= accumulator_in;
+				
+				flags_out <= flags_in;
 			end else if (take_out) begin
 				out_valid <= 0;
 			end

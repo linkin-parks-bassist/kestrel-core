@@ -25,7 +25,10 @@ module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
 		output reg [data_width - 1 : 0] register_1_out,
 		
 		input wire [31 : 0] instr_in,
-		output reg [31 : 0] instr_out
+		output reg [31 : 0] instr_out,
+		
+		input wire [3:0] flags_in,
+		output reg [3:0] flags_out
 	);
 	
 	reg in_valid;
@@ -39,6 +42,7 @@ module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
 	reg [data_width - 1 : 0] register_0_skid;
 	reg [data_width - 1 : 0] register_1_skid;
 	reg [$clog2(n_blocks) - 1 : 0] block_skid;
+	reg [3:0] flags_skid;
 	
 	reg [$clog2(n_blocks) - 1 : 0] block_r;
 	
@@ -70,6 +74,7 @@ module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
 				register_0_out <= register_0_skid;
 				register_1_out <= register_1_skid;
 				block_out 	   <= block_skid;
+				flags_out	   <= flags_skid;
 				out_valid <= 1;
 				skid <= 0;
 			end
@@ -81,12 +86,14 @@ module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
 					register_0_skid <= register_0_in;
 					register_1_skid <= register_1_in;
 					block_skid 		<= block_r;
+					flags_skid		<= flags_in;
 					skid <= 1;
 				end else begin
 					instr_out 	   <= instr_in;
 					register_0_out <= register_0_in;
 					register_1_out <= register_1_in;
-					block_out <= block_r;
+					block_out 	   <= block_r;
+					flags_out	   <= flags_in;
 				end
 				
 				out_valid <= 1;
@@ -255,7 +262,9 @@ module instr_decode_stage #(parameter data_width = 16, parameter n_blocks = 256)
 		
 		output reg [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_out,
 
-		output reg [$clog2(`N_MISC_OPS) - 1 : 0] misc_op_out
+		output reg [$clog2(`N_MISC_OPS) - 1 : 0] misc_op_out,
+		
+		output wire [3:0] flags_out
 	);
 	
 	assign in_ready = ~out_valid | out_ready;
@@ -296,6 +305,8 @@ module instr_decode_stage #(parameter data_width = 16, parameter n_blocks = 256)
 	
 	wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch;
 	
+	wire [3:0] flags;
+	
 	instr_decoder #(.data_width(data_width)) dec
 	(
 		.instr(instr_in),
@@ -331,7 +342,9 @@ module instr_decode_stage #(parameter data_width = 16, parameter n_blocks = 256)
 		.commit_flag(commit_flag),
 		.writes_external(writes_external),
 		
-		.branch(branch)
+		.branch(branch),
+		
+		.flags(flags)
 	);
 
 	always @(posedge clk) begin
@@ -440,7 +453,9 @@ module block_fetch_decode_stage #(parameter data_width = 16, parameter n_blocks 
 		
 		output wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_out,
 
-		output wire [$clog2(`N_MISC_OPS) - 1 : 0] misc_op_out
+		output wire [$clog2(`N_MISC_OPS) - 1 : 0] misc_op_out,
+		
+		output wire [3:0] flags_out
 	);
 	
 	wire out_valid_1;
@@ -561,7 +576,9 @@ module block_fetch_decode_stage #(parameter data_width = 16, parameter n_blocks 
 		
 		.branch_out(branch_out),
 
-		.misc_op_out(misc_op_out)
+		.misc_op_out(misc_op_out),
+		
+		.flags_out(flags_out)
 	);
 	
 endmodule
