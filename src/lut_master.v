@@ -18,6 +18,8 @@ module lut_master #(parameter data_width = 16) (
 		input wire clk,
 		input wire reset,
 		
+		input wire enable,
+		
 		input wire req,
 		input wire [`LUT_HANDLE_WIDTH - 1 : 0] lut_handle,
 		input wire [data_width - 1 : 0] req_arg,
@@ -80,9 +82,7 @@ module lut_master #(parameter data_width = 16) (
 			invalid_request <= 0;
 			valid <= 0;
 			state <= `LUT_MASTER_STATE_READY;
-		end
-		else begin
-			
+		end else if (enable) begin
 			case (state)
 				`LUT_MASTER_STATE_READY: begin
 					if (!wait_one && req) begin

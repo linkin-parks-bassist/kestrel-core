@@ -155,6 +155,82 @@ int append_send_queue(kest_fpga_transfer_batch batch, int when)
 	return 0;
 }
 
+int schedule_byte(uint8_t byte, int when)
+{
+	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
+	
+	kest_fpga_batch_append(&batch, byte);
+	
+	return append_send_queue(batch, when);
+}
+
+int schedule_bytes(uint8_t *bytes, int count, int when)
+{
+	if (!bytes)
+		return ERR_NULL_PTR;
+	
+	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
+	
+	for (int i = 0; i < count; i++)
+		kest_fpga_batch_append(&batch, bytes[i]);
+	
+	return append_send_queue(batch, when);
+}
+
+int schedule_short(uint16_t byte, int when)
+{
+	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
+	
+	kest_fpga_batch_append_16(&batch, byte);
+	
+	return append_send_queue(batch, when);
+}
+
+int schedule_q15f(float x, int when)
+{
+	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
+	
+	if (x >  1.0 - pow(2.0, -15.0)) x = 1.0 - pow(2.0, -15.0);
+	if (x < -1.0) x = -1.0;
+	
+	int16_t s = (int16_t)(x * pow(2, 15));
+	
+	kest_fpga_batch_append_16(&batch, s);
+	
+	return append_send_queue(batch, when);
+}
+
+int schedule_qnf(float x, int format, int when)
+{
+	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
+	
+	printf("x = %f\n", x);
+	
+	float sat_max =  pow(2.0, format) - pow(2.0, -15.0 + (float)format);
+	float sat_min = -pow(2.0, format);
+	
+	printf("sat_max = %f, sat_min = %f\n", sat_max, sat_min);
+	
+	if (x > sat_max)
+	{
+		printf("too big.\n");
+		x = sat_max;
+	}
+	if (x < sat_min)
+	{
+		printf("too small.\n");
+		x = sat_min;
+	}
+	
+	int16_t s = (int16_t)(x * pow(2.0, 15.0 - (float)format));
+	
+	printf("x = %f, s = %d\n", x, s);
+	
+	kest_fpga_batch_append_16(&batch, s);
+	
+	return append_send_queue(batch, when);
+}
+
 void pop_send_queue()
 {
 	if (!send_queue)
@@ -208,16 +284,18 @@ int main(int argc, char** argv)
 	std::vector<int16_t> in_samples;
 	WavHeader header;
 	
-	int use_wavs = 0;
+	int use_wavs = 1;
 	
     const char* in_path  = NULL;
 	const char* out_path = NULL;
 	
-    if (argc > 3)
+    if (argc >= 3)
     {
 		use_wavs = 1;
         in_path  = argv[1];
 		out_path = argv[2];
+
+		std::cout << "Read WAV file " << in_path << std::endl;
 
 		if (!read_wav16_mono(in_path, header, in_samples)) {
 			std::cerr << "Failed to read WAV\n";
@@ -249,8 +327,19 @@ int main(int argc, char** argv)
 	
 	printf("Starting...\n");
 	
-	printf("Load low pass filter...\n");
-	kest_effect_desc *test_desc = kest_read_eff_desc_from_file("eff/del.eff");
+	float g = 0.0;
+	for (int i = 0; i < 5; i++)
+	{
+		g += 1.0/5.0;
+		
+		printf("%f\n", g);
+		schedule_byte(COMMAND_SET_INPUT_GAIN, 15+i);
+		schedule_qnf(g, 5, 15+i);
+		schedule_byte(COMMAND_SET_OUTPUT_GAIN, 15+i);
+		schedule_qnf(g, 5, 15+i);
+	}
+	
+	kest_effect_desc *test_desc = kest_read_eff_desc_from_file("eff/DEL.EFF");
 	
 	if (!test_desc)
 	{
@@ -259,20 +348,53 @@ int main(int argc, char** argv)
 	}
 	
 	kest_effect test_effect;
+	kest_effect test_effect2;
 	
-	if (test_desc)   init_effect_from_effect_desc(&test_effect, test_desc);
+	if (test_desc)   init_effect_from_effect_desc(&test_effect,  test_desc);
+	if (test_desc)   init_effect_from_effect_desc(&test_effect2, test_desc);
 	
-	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
 	
 	kest_eff_resource_report res = empty_m_eff_resource_report();
 	
 	int pos = 0;
 
+	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
+	
 	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
 	kest_fpga_batch_append_effect(&batch, &test_effect, &res, &pos);
 	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
 	
-	append_send_queue(batch, 5);
+	append_send_queue(batch, 128);
+
+	pos = 0;
+	res = empty_m_eff_resource_report();
+	batch = kest_new_fpga_transfer_batch();
+	
+	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
+	kest_fpga_batch_append_effect(&batch, &test_effect2, &res, &pos);
+	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
+	
+	append_send_queue(batch, 800);
+
+	pos = 0;
+	res = empty_m_eff_resource_report();
+	batch = kest_new_fpga_transfer_batch();
+	
+	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
+	kest_fpga_batch_append_effect(&batch, &test_effect2, &res, &pos);
+	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
+	
+	append_send_queue(batch, 1768);
+
+	pos = 0;
+	res = empty_m_eff_resource_report();
+	batch = kest_new_fpga_transfer_batch();
+	
+	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
+	kest_fpga_batch_append_effect(&batch, &test_effect2, &res, &pos);
+	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
+	
+	append_send_queue(batch, 2256);
 	
 	int samples_to_process = (n_samples < MAX_SAMPLES) ? n_samples : MAX_SAMPLES;
 	if (!use_wavs)
@@ -330,8 +452,9 @@ int main(int argc, char** argv)
 			samples_processed++;
 			t += sample_duration;
 			
-			io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1000.0f * t/* * ((float)samples_processed / (float)samples_to_process)*/) * 32767.0 * 0.5f));
-			//io.sample_in = static_cast<int16_t>(in_samples[samples_processed]);
+			//io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1200.0f * t/* * ((float)samples_processed / (float)samples_to_process)*/) * 32767.0 * 1.0f));
+			io.sample_in = static_cast<int16_t>(in_samples[samples_processed]);
+			//io.sample_in = (rand() % 32767) - (1 << 14);
 			
 			if (use_wavs)
 			{

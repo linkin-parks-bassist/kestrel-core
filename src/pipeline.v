@@ -155,6 +155,19 @@ module dsp_pipeline #(
 		.svf_block_out(svf_block_in)
 	);
 	
+	reg enable_latched;
+	wire pr_enable = enable_latched;
+	
+	always @(posedge clk) begin
+		enable_latched <= enable_latched | enable;
+		
+		if (reset | full_reset) begin
+			enable_latched <= 0;
+		end
+	end
+	
+	
+	
 	/************************/
 	/* Peripheral resources */
 	/************************/
@@ -163,6 +176,8 @@ module dsp_pipeline #(
 	lut_master #(.data_width(data_width)) luts (
 		.clk(clk),
 		.reset(reset | full_reset),
+		
+		.enable(pr_enable),
 		
 		.lut_handle(lut_req_handle),
 		.req_arg(lut_req_arg),
@@ -198,7 +213,7 @@ module dsp_pipeline #(
 		.clk(clk),
 		.reset(reset | full_reset),
 		
-		.enable(1'b1),
+		.enable(pr_enable),
 		
 		.alloc_req  (alloc_delay),
 		
@@ -254,7 +269,7 @@ module dsp_pipeline #(
 		.clk(clk),
 		.reset(reset | resetting),
 		
-		.enable(1'b1),
+		.enable(pr_enable),
 		
 		.alloc_req(alloc_filter),
 		.order_ff(filter_order_ff),
@@ -304,7 +319,7 @@ module dsp_pipeline #(
 		.clk(clk),
 		.reset(reset | resetting),
 		
-		.enable(enable),
+		.enable(pr_enable),
 		
 		.data_in(svf_data_in),
 		.cutoff_in(svf_cutoff_in),
@@ -367,7 +382,6 @@ module dsp_pipeline #(
 	wire invalid_delay_write;
 	wire invalid_delay_alloc;
 	
-	// FSM deprecated; remove carefully without breaking anything later
 	always @(posedge clk) begin
 		wait_one <= 0;
 		if (reset | full_reset) begin

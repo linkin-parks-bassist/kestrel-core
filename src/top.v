@@ -114,6 +114,8 @@ module top #(
 	wire bclk_posedge = bclk & ~bclk_prev;
 	wire lrclk_posedge   = lrclk & ~lrclk_prev;
 	
+	reg [63:0] sample_ctr;
+	
 	always @(posedge sys_clk) begin
 		mclk_prev <= mclk;
 		bclk_prev <= bclk;
@@ -121,6 +123,7 @@ module top #(
 		
 		cycle_ctr <= cycle_ctr + 1;
 		if (sample_valid) begin
+			sample_ctr <= sample_ctr + 1;
 			sample_cycle_ctr <= 0;
 			sample_mclk_cycle_ctr <= 0;
 			sample_bclk_cycle_ctr <= 0;
@@ -154,6 +157,8 @@ module top #(
 				end
 			end
 		end
+		
+		if (reset) sample_ctr <= 0;
 	end
 	
 	localparam MAIN_FREQ  = 112500000;

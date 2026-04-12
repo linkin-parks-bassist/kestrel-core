@@ -30,6 +30,7 @@
 `define COMMAND_GET_SAMPLE_COUNT	8'd34
 `define COMMAND_CLEAR_TIMEOUT_FLAG	8'd35
 `define COMMAND_CLEAR_BAD_FLAG		8'd36
+`define COMMAND_CLEAR_CMD_ERR_FLAG	8'd37
 
 // If we're in a 'waiting' state, but no new data has
 // appeared for a whole 100ms, then it's likely

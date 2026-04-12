@@ -441,9 +441,9 @@ module delay_master #(parameter data_width  = 16,
 				
 				WRITE_4: begin
 					if (mem_write_ack) begin
-						state <= IDLE;
 						write_wait_one <= 1;
 						write_ack <= 1;
+						state <= IDLE;
 					end
 				end
 			endcase

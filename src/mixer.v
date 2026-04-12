@@ -42,7 +42,6 @@ module mixer #(parameter data_width = 16, parameter gain_shift = 4) (
 		input wire current_pipeline
 	);
 	
-	/* All gains herein are stored as q5.n */
 	localparam signed sat_max = {{(data_width + 1){1'b0}}, {(data_width - 1){1'b1}}};
 	localparam signed sat_min = {{(data_width + 1){1'b1}}, {(data_width - 1){1'b0}}};
 	
@@ -106,8 +105,8 @@ module mixer #(parameter data_width = 16, parameter gain_shift = 4) (
 			target_pipeline		<= 0;
 			pipeline_swap_requested <= 0;
 			
-			input_gain  <= 1 << (data_width - 1 - gain_shift);
-			output_gain <= 1 << (data_width - 1 - gain_shift);
+			input_gain  <= 0;
+			output_gain <= 0;
 			
 			output_a_gain <= 1 << (data_width - 1 - gain_shift);
 			output_b_gain <= 0;

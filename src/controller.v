@@ -280,6 +280,8 @@ module control_unit
 					timeout <= 1;
 				else
 					timeout_ctr <= timeout_ctr + 1;
+			end else begin
+				timeout_ctr <= 0;
 			end
 			
 			if (timeout_blinker_ctr != 0)
@@ -516,6 +518,11 @@ module control_unit
 							
 							`COMMAND_CLEAR_BAD_FLAG: begin
 								bad_flag <= 0;
+								state <= READY;
+							end
+							
+							`COMMAND_CLEAR_CMD_ERR_FLAG: begin
+								cmd_err_flag <= 0;
 								state <= READY;
 							end
 							
