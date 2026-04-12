@@ -174,8 +174,8 @@ module dsp_engine #(
 		.in_sample(in_sample_latched),
 		.in_sample_out(in_sample_amped),
 		
-		.out_sample_in_a(out_samples[0]),
-		.out_sample_in_b(out_samples[1]),
+		.out_sample_in_a(out_samples_a),
+		.out_sample_in_b(out_samples_b),
 		
 		.out_sample(out_sample_mixed),
 		
@@ -403,6 +403,9 @@ module dsp_engine #(
 	/* FSM */
 	/*******/
 	
+	reg signed [data_width - 1 : 0] out_samples_a;
+	reg signed [data_width - 1 : 0] out_samples_b;
+	
 	always @(posedge clk) begin
 		pipeline_tick 		<= 0;
 		
@@ -415,27 +418,18 @@ module dsp_engine #(
 					in_sample_latched <= in_sample;
 					apply_input_gain <= 1;
 					ready <= 0;
+					
+					out_samples_a <= pipeline_a_ready ? out_samples[0] : 0;
+					out_samples_b <= pipeline_b_ready ? out_samples[1] : 0;
 				end
 				
 				if (in_sample_valid) begin
-					apply_input_gain <= 0;
+					mix_outputs <= 1;
 					
 					sample_ctr <= sample_ctr + 1;
 					pipeline_tick <= 1;	
 					
 					ready <= 0;
-					state <= `ENGINE_STATE_PROCESSING_WAIT;
-				end
-			end
-			
-			`ENGINE_STATE_PROCESSING_WAIT: begin
-				state <= `ENGINE_STATE_PROCESSING;
-			end
-			
-			`ENGINE_STATE_PROCESSING: begin
-				if (pipeline_a_ready && pipeline_b_ready) begin
-					mix_outputs <= 1;
-					
 					state <= `ENGINE_STATE_MIXING;
 				end
 			end
