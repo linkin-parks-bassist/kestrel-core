@@ -1,3 +1,5 @@
+`include "defs.vh"
+
 `default_nettype none
 
 module delay_master #(parameter data_width  = 16,
@@ -43,8 +45,20 @@ module delay_master #(parameter data_width  = 16,
 		output reg [31:0] data_return,
 		output reg data_return_valid,
 
-        input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in
+        input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
+        
+        output wire stuck
 	);
+	
+	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
+	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
+	
+	always @(posedge clk) begin
+		if (reset || n_buffers_allocd == 0 || state != state_prev)
+			stuck_ctr <= 0;
+		else if (enable && stuck_ctr < `CYCLES_PER_SAMPLE)
+			stuck_ctr <= stuck_ctr + 1;
+	end
 	
 	reg data_req_active;
 	
@@ -166,6 +180,7 @@ module delay_master #(parameter data_width  = 16,
 	localparam READ_7	 	= 4'd12;
 	
 	reg [3:0] state;
+	reg [3:0] state_prev;
 	
 	localparam buf_info_width = addr_width + addr_width + delay_width + addr_width + data_width + 1;
 	
@@ -270,6 +285,8 @@ module delay_master #(parameter data_width  = 16,
 		
 		mem_req <= 0;
 		
+		state_prev <= state;
+		
 		if (reset) begin
 			state <= IDLE;
 			buf_data_invalid <= 0;
@@ -316,6 +333,8 @@ module delay_master #(parameter data_width  = 16,
 			read_wait_one <= 0;
 			write_wait_one <= 0;
 			allocing <= 0;
+			
+			state_prev <= 0;
 			
 			read_req_prev <= 0;
 			read_req_posedge_latched <= 0;

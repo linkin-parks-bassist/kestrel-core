@@ -80,6 +80,7 @@ module dsp_pipeline #(
 	/*******************/
 	
     wire [7:0] core_out;
+    wire [15:0] stuck_flags_core;
 
 	dsp_core #(
 		.data_width(data_width),
@@ -152,7 +153,9 @@ module dsp_pipeline #(
 		
 		.svf_req(svf_req),
 		.svf_ack(svf_ack),
-		.svf_block_out(svf_block_in)
+		.svf_block_out(svf_block_in),
+		
+		.stuck_flags(stuck_flags_core)
 	);
 	
 	reg enable_latched;
@@ -195,6 +198,8 @@ module dsp_pipeline #(
 
     wire [data_width - 1 : 0] delay_read_delay;
     wire any_delay_buffers;
+    
+    wire stuck_delay;
 
 	/*	
 	`COMMAND_ALLOC_DELAY: begin
@@ -247,7 +252,9 @@ module dsp_pipeline #(
         
         .data_req(data_req_delay),
         .data_return(data_return_delay),
-        .data_return_valid(data_return_valid_delay)
+        .data_return_valid(data_return_valid_delay),
+        
+        .stuck(stuck_delay)
 	);
 	
 	wire filter_calc_req;
@@ -445,6 +452,12 @@ module dsp_pipeline #(
 
 	reg [`CTRL_DATA_BUS_WIDTH - 1 : 0] data_req_ctrl_data_r;
 	
+	wire [31:0] stuck_flags;
+	
+	assign stuck_flags[31:17] = 0;
+	assign stuck_flags[16] = stuck_delay;
+	assign stuck_flags[15:0] = stuck_flags_core;
+	
 	always @(*) begin
 		case (ctrl_data_in[7:0])
 			`DATA_REQ_N_BLOCKS:    data_req_target = DATA_REQ_TARGET_CORE;
@@ -483,6 +496,11 @@ module dsp_pipeline #(
 					case (ctrl_data_in[7:0])
 						`DATA_REQ_SAMPLE_COUNT: begin
 							data_return <= sample_ctr;
+							data_return_valid <= 1;
+						end
+						
+						`DATA_REQ_STUCK_FLAGS: begin
+							data_return <= stuck_flags;
 							data_return_valid <= 1;
 						end
 					endcase

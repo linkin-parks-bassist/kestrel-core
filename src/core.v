@@ -91,10 +91,10 @@ module dsp_core #(
 		input wire svf_data_valid,
 		
 		output wire svf_req,
-		input wire svf_ack
+		input wire svf_ack,
+		
+		output wire [15:0] stuck_flags
 	);
-	
-	wire [31:0] stuck_flags;
 	
 	wire stuck_bfds;
 	wire stuck_ofs;
