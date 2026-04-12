@@ -477,9 +477,6 @@ module block_fetch_decode_stage #(parameter data_width = 16, parameter n_blocks 
 		output wire stuck
 	);
 	
-	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
-	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
-	
 	wire out_valid_1;
 	wire [$clog2(n_blocks) - 1 : 0] block_1_out;
 	wire [31 : 0] instr_1_out;
