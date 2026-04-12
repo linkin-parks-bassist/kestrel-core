@@ -80,26 +80,17 @@ module sdram
 );
 
 `ifdef verilator
-`define crusty_sim
+`define naive_sim
 `endif
 
-`ifdef crusty_sim
-reg [31 : 0] sim_mem [(1 << 19) : 0];
+`ifdef naive_sim
+reg [15 : 0] sim_mem [(1 << 20) : 0];
 
-reg  [31 : 0] sim_mem_write_val;
-wire [15 : 0] sim_mem_write_val_0 = sim_mem_write_val[15: 0];
-wire [15 : 0] sim_mem_write_val_1 = sim_mem_write_val[31:16];
-reg  [31 : 0] sim_mem_read_val;
-wire [15 : 0] sim_mem_read_val_0 = sim_mem_read_val[15: 0];
-wire [15 : 0] sim_mem_read_val_1 = sim_mem_read_val[31:16];
+reg  [15 : 0] sim_mem_write_val;
+reg  [15 : 0] sim_mem_read_val;
 reg  [20 : 0] sim_mem_write_addr;
-wire [19 : 0] sim_mem_write_addr_ = sim_mem_write_addr[19:0];
 reg  [20 : 0] sim_mem_read_addr;
-wire [19 : 0] sim_mem_read_addr_ = sim_mem_read_addr[19:0];
 reg  [20 : 0] sim_addr_latched;
-wire [19 : 0] sim_addr_latched_ = sim_addr_latched[19:0];
-
-reg  [19 : 0] read_addr;
 
 reg sim_mem_write_enable;
 
@@ -121,16 +112,12 @@ wire [DATA_WIDTH-1:0] dq_in = SDRAM_DQ;     // DQ input
 
 reg off;          // byte offset
 reg  [data_width - 1 : 0] dout_buf;
-`ifdef crusty_sim
-wire [data_width - 1 : 0] next_dout =  off ? sim_mem_read_val_1 : sim_mem_read_val_0;
-reg [10:0] WRITE_A;
-reg [10:0] READ_A;
-reg [3:0] WRITE_DQM;
-reg [3:0] READ_DQM;
+`ifdef naive_sim
+wire [data_width - 1 : 0] next_dout =  sim_mem_read_val;
 `else
 wire [data_width - 1 : 0] next_dout =  off ? dq_in[2 * data_width - 1 : data_width] : dq_in[data_width - 1 : 0];
-
 `endif
+
 assign dout = data_ready ? next_dout : dout_buf;
 assign dout32 = dq_in;
 assign SDRAM_CLK = clk_sdram;
@@ -169,7 +156,7 @@ reg [21:0] addr_buf;
 // SDRAM state machine
 //
 always @(posedge clk) begin
-	`ifdef crusty_sim
+	`ifdef naive_sim
 	sim_mem_write_enable <= 0;
 	`endif
 	
@@ -223,10 +210,8 @@ always @(posedge clk) begin
             SDRAM_A <= addr[ROW_WIDTH + COL_WIDTH - 1 + addr_offs : COL_WIDTH + addr_offs];      // 12-bit row address
             state <= rd ? READ : WRITE;
             addr_buf <= addr;
-            `ifdef crusty_sim
-            sim_mem_read_addr <= addr >> 1;
-            if (rd)
-				read_addr <= addr[19:0];
+            `ifdef naive_sim
+            sim_mem_read_addr <= addr;
             `endif
             if (wr) din_buf <= din;
             cycle <= 4'd1;
@@ -259,10 +244,6 @@ always @(posedge clk) begin
         end
         {READ, T_RCD+CAS}: begin
             data_ready <= 1'b1;
-            `ifdef crusty_sim
-            READ_A <= SDRAM_A;
-            READ_DQM <= SDRAM_DQM;
-            `endif
         end
         {READ, T_RCD+CAS+4'd1}: begin
             data_ready <= 1'b0;
@@ -282,30 +263,22 @@ always @(posedge clk) begin
             {SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_Write;
             SDRAM_A[10] <= 1'b1;        // set auto precharge
             SDRAM_A[9:0] <= {1'b0, addr_buf[COL_WIDTH - 1 + addr_offs : addr_offs]};  // column address
-            SDRAM_DQM <= addr_buf[0] ? 4'b1100 : 4'b0011;     // only write the correct word
+            SDRAM_DQM <= addr_buf[0] == 0 ? 4'b1100 : 4'b0011;     // only write the correct word
             off <= addr_buf[0];
             dq_out <= {din_buf,din_buf};
             dq_oen <= 1'b0;                 // DQ output on
             
             write_count <= write_count + 1;
-            `ifdef crusty_sim
-            sim_mem_read_addr <= addr_buf >> 1;
+            `ifdef naive_sim
+            sim_mem_write_addr <= addr_buf;
+            sim_mem_write_val <= din_buf;
+            sim_mem_write_enable <= 1;
             `endif
         end
         {WRITE, T_RCD+4'd1}: begin
             dq_oen <= 1'b1;
-            `ifdef crusty_sim
-            WRITE_A <= SDRAM_A;
-            WRITE_DQM <= SDRAM_DQM;
-            `endif
         end
-        `ifdef crusty_sim
-        {WRITE, T_RCD+4'd2}: begin
-			sim_mem_write_val <= off ? {din_buf, sim_mem_read_val[15:0]} : {sim_mem_read_val[31:16], din_buf};
-			sim_mem_write_addr <= addr_buf >> 1;
-			sim_mem_write_enable <= 1;
-        end
-        `endif
+
         {WRITE, T_RCD+T_WR+T_RP}: begin  // 2+2+1
             busy <= 0;
             state <= IDLE;
@@ -328,10 +301,6 @@ always @(posedge clk) begin
         dq_oen <= 1'b1;         // turn off DQ output
         SDRAM_DQM <= 4'b0;
         state <= INIT;
-        
-        `ifdef crusty_sim
-        sim_mem_write_enable <= 0;
-        `endif
     end
 end
 
