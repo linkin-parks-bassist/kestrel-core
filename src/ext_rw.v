@@ -4,7 +4,7 @@
 
 `default_nettype none
 
-module resource_branch #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16) (
+module resource_branch #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
 		input wire clk,
 		input wire reset,
 		
@@ -24,8 +24,8 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 		input wire write,
 		
 		input wire [handle_width - 1 : 0] handle_in,
-		input wire [data_width   - 1 : 0] arg_a_in,
-		input wire [data_width   - 1 : 0] arg_b_in,
+		input wire signed [data_width   - 1 : 0] arg_a_in,
+		input wire signed [data_width   - 1 : 0] arg_b_in,
 		
 		output wire read_req,
 		output wire write_req,
@@ -41,7 +41,7 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 		input wire [ch_addr_w - 1 : 0] dest_in,
 		output reg [ch_addr_w - 1 : 0] dest_out,
 		
-		output reg signed [full_width - 1 : 0] result_out,
+		output reg signed [data_width - 1 : 0] result_out,
 		
 		input wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
 		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
@@ -74,6 +74,11 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 		if (reset) begin
 			state <= IDLE;
 			commit_id_out <= 0;
+			write_latched <= 0;
+			
+			block_latched <= 0;
+			commit_id_latched <= 0;
+			dest_latched <= 0;
 		end else if (enable) begin
 			
 			case (state)
@@ -102,7 +107,7 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 					if (write_latched && write_ack) begin
 						state <= IDLE;
 					end else if (!write_latched && read_valid) begin
-						result_out <= {{(data_width){data_in[data_width-1]}}, data_in};
+						result_out <= data_in;
 						
 						commit_id_out <= commit_id_latched;
 						block_out <= block_latched;
@@ -122,7 +127,7 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 	end
 endmodule
 
-module resource_branch_pulsed #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16) (
+module resource_branch_pulsed #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
 		input wire clk,
 		input wire reset,
 		
@@ -142,8 +147,8 @@ module resource_branch_pulsed #(parameter data_width = 16, parameter handle_widt
 		input wire write,
 		
 		input wire [handle_width - 1 : 0] handle_in,
-		input wire [data_width   - 1 : 0] arg_a_in,
-		input wire [data_width   - 1 : 0] arg_b_in,
+		input wire signed [data_width - 1 : 0] arg_a_in,
+		input wire signed [data_width - 1 : 0] arg_b_in,
 		
 		output reg read_req,
 		output reg write_req,
@@ -151,6 +156,7 @@ module resource_branch_pulsed #(parameter data_width = 16, parameter handle_widt
 		output reg 		[handle_width - 1 : 0] handle_out,
 		output reg signed [data_width - 1 : 0] arg_a_out,
 		output reg signed [data_width - 1 : 0] arg_b_out,
+		
 		input wire signed [data_width - 1 : 0] data_in,
 		
 		input wire read_valid,
@@ -159,7 +165,7 @@ module resource_branch_pulsed #(parameter data_width = 16, parameter handle_widt
 		input wire [ch_addr_w - 1 : 0] dest_in,
 		output reg [ch_addr_w - 1 : 0] dest_out,
 		
-		output reg signed [full_width - 1 : 0] result_out,
+		output reg signed [data_width - 1 : 0] result_out,
 		
 		input wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
 		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
@@ -191,9 +197,15 @@ module resource_branch_pulsed #(parameter data_width = 16, parameter handle_widt
 		
 		if (reset) begin
 			state <= IDLE;
-			commit_id_out <= 0;
-			read_req <= 0;
-			write_req <= 0;
+			
+			commit_id_out	<= 0;
+			read_req 		<= 0;
+			write_req 		<= 0;
+			write_latched 	<= 0;
+			
+			block_latched 		<= 0;
+			commit_id_latched 	<= 0;
+			dest_latched 		<= 0;
 		end else if (enable) begin
 			case (state)
 				IDLE: begin
@@ -207,11 +219,11 @@ module resource_branch_pulsed #(parameter data_width = 16, parameter handle_widt
 						
 						write_latched <= write;
 						
-						commit_id_latched <= commit_id_in;
-						block_latched <= block_in;
+						commit_id_latched 	<= commit_id_in;
+						block_latched 		<= block_in;
 						
-						req_id_out <= block_in;
-						flags_out <= flags_in;
+						req_id_out 	<= block_in;
+						flags_out 	<= flags_in;
 						
 						state <= REQ;
 						
@@ -226,7 +238,7 @@ module resource_branch_pulsed #(parameter data_width = 16, parameter handle_widt
 					if (write_latched && write_ack) begin
 						state <= IDLE;
 					end else if (!write_latched && read_valid) begin
-						result_out <= {{(data_width){data_in[data_width-1]}}, data_in};
+						result_out <= data_in;
 						
 						commit_id_out <= commit_id_latched;
 						block_out <= block_latched;
@@ -246,7 +258,7 @@ module resource_branch_pulsed #(parameter data_width = 16, parameter handle_widt
 	end
 endmodule
 
-module resource_branch_filter #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16) (
+module resource_branch_filter #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
 		input wire clk,
 		input wire reset,
 		
@@ -266,9 +278,9 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 		input wire write,
 		
 		input wire [handle_width - 1 : 0] handle_in,
-		input wire [data_width   - 1 : 0] arg_a_in,
-		input wire [data_width   - 1 : 0] arg_b_in,
-		input wire [data_width   - 1 : 0] arg_c_in,
+		input wire signed [data_width   - 1 : 0] arg_a_in,
+		input wire signed [data_width   - 1 : 0] arg_b_in,
+		input wire signed [data_width   - 1 : 0] arg_c_in,
 		
 		output wire read_req,
 		output wire write_req,
@@ -295,7 +307,7 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 		input wire [4 : 0] shift_in,
 		output reg [4 : 0] shift_out,
 		
-		output reg signed [full_width - 1 : 0] result_out,
+		output reg signed [data_width - 1 : 0] result_out,
 		
 		input wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
 		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
@@ -327,16 +339,21 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 	
 	reg [3:0] flags_latched;
 	
-	wire signed [full_width - 1 : 0] svf_low  = {{(full_width - data_width){svf_low_in[data_width-1]}}, svf_low_in};
-	wire signed [full_width - 1 : 0] svf_high = {{(full_width - data_width){svf_high_in[data_width-1]}}, svf_high_in};
-	wire signed [full_width - 1 : 0] svf_band = {{(full_width - data_width){svf_band_in[data_width-1]}}, svf_band_in};
+	wire signed [acc_width - 1 : 0] svf_low  = {{(acc_width - data_width){svf_low_in[data_width-1]}}, svf_low_in};
+	wire signed [acc_width - 1 : 0] svf_high = {{(acc_width - data_width){svf_high_in[data_width-1]}}, svf_high_in};
+	wire signed [acc_width - 1 : 0] svf_band = {{(acc_width - data_width){svf_band_in[data_width-1]}}, svf_band_in};
 	
 	always @(posedge clk) begin
 		svf_req <= 0;
 		
 		if (reset) begin
-			state <= 0;
+			state <= IDLE;
 			commit_id_out <= 0;
+			write_latched <= 0;
+			
+			block_latched <= 0;
+			commit_id_latched <= 0;
+			dest_latched <= 0;
 		end else if (enable) begin
 			case (state)
 				IDLE: begin
@@ -373,7 +390,7 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 					if (write_latched && write_ack) begin
 						state <= IDLE;
 					end else if (!write_latched && read_valid) begin
-						result_out <= {{(full_width - data_width){data_in[data_width-1]}}, data_in};
+						result_out <= data_in;
 						
 						commit_id_out <= commit_id_latched;
 						dest_out <= dest_latched;

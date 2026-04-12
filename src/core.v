@@ -20,6 +20,7 @@
 
 module dsp_core #(
 		parameter integer data_width 		= 16,
+		parameter integer acc_width			= 2 * data_width + 8,
 		parameter integer n_blocks			= 256,
 		parameter integer sdram_addr_width 	= 20,
 		parameter integer memory_size		= 1024,
@@ -131,7 +132,6 @@ module dsp_core #(
 	localparam mem_addr_w 		= $clog2(memory_size);
 	localparam ch_addr_w 		= $clog2(n_channels);
 	localparam reg_addr_w		= $clog2(n_blocks) + 1;
-	localparam full_width		= 2 * data_width + 8;
 	
 	always @(posedge clk) begin
 		if (tick) sample_out <= channels[0];
@@ -361,29 +361,18 @@ module dsp_core #(
 			mem[mem_write_addr] <= mem_write_val;
 	end
 	
-	reg signed [full_width - 1 : 0] accumulator;
-	wire [full_width - 1 : 0] abs_accumulator = (accumulator < 0) ? -accumulator : accumulator;
+	reg signed [acc_width - 1 : 0] accumulator;
 	
-	localparam signed [full_width - 1 : 0] sat_max = ( 1 << (2 * data_width - 1)) - 1;
-	localparam signed [full_width - 1 : 0] sat_min = (-1 << (2 * data_width - 1));
-	
-	wire signed [full_width - 1 : 0] acc_sat = accumulator < sat_min ? sat_min : ((accumulator > sat_max) ? sat_max : accumulator);
-	wire signed [data_width - 1 : 0] acc_norm = acc_sat[2 * data_width - 1 : data_width];
-	
-	wire signed [full_width - 1 : 0] accumulator_write_val;
+	wire signed [acc_width - 1 : 0] accumulator_write_val;
 	wire accumulator_write_enable;
 	wire accumulator_add_enable;
 	
 	always @(posedge clk) begin
-		if (reset) begin
-			accumulator <= 0;
-		end else if (full_reset) begin
+		if (reset | full_reset) begin
 			accumulator <= 0;
 		end else if (accumulator_write_enable) begin
-			if (accumulator_add_enable)
-				accumulator <= accumulator + accumulator_write_val;
-			else
-				accumulator <= accumulator_write_val;
+			if (accumulator_add_enable) accumulator <= accumulator + accumulator_write_val;
+			else 						accumulator <= accumulator_write_val;
 		end
 	end
 	
@@ -549,7 +538,7 @@ module dsp_core #(
 	/* Branch Router */
 	/*****************/
 	
-	branch_router #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) router (
+	branch_router #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) router (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -621,7 +610,7 @@ module dsp_core #(
 	/**************************/
 	/* Main arithmetic branch */
 	/**************************/
-	madd_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) madd_branch (
+	madd_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) madd_branch (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -660,7 +649,7 @@ module dsp_core #(
 	/*********************************************/
 	/* MAC branch; the accumulator owning branch */
 	/*********************************************/
-	mac_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .shift_type(`SHIFT_TYPE_LSH)) mac_branch (
+	mac_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .shift_type(`SHIFT_TYPE_LSH)) mac_branch (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -684,7 +673,7 @@ module dsp_core #(
 		.arg_b_in(arg_b_out_router),
 		.arg_c_in(arg_c_out_router),
 		
-		.result_out(result_final_stages[`INSTR_BRANCH_MAC]),
+		.result_out(result_mac_branch),
 		
 		.dest_in(dest_out_router),
 		.dest_out(dest_final_stages[`INSTR_BRANCH_MAC]),
@@ -699,7 +688,7 @@ module dsp_core #(
 	/************************************************/
 	/* Misc branch; other operations, data movement */
 	/************************************************/
-	misc_branch #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) misc (
+	misc_branch #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) misc (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -745,7 +734,7 @@ module dsp_core #(
 	/**********/
 	/* Delays */
 	/**********/
-	resource_branch_pulsed #(.data_width(data_width), .handle_width(8), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) delay_stage (
+	resource_branch_pulsed #(.data_width(data_width), .handle_width(8), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) delay_stage (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -793,7 +782,7 @@ module dsp_core #(
 	/********/
 	/* LUTs */
 	/********/
-	resource_branch #(.data_width(data_width), .handle_width(8), .full_width(full_width), .n_channels(n_channels)) lut_stage (
+	resource_branch #(.data_width(data_width), .handle_width(8), .acc_width(acc_width), .n_channels(n_channels)) lut_stage (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -841,7 +830,7 @@ module dsp_core #(
 	/**********/
 	/* Memory */
 	/**********/
-	resource_branch #(.data_width(data_width), .handle_width(8), .full_width(full_width), .n_channels(n_channels)) mem_stage (
+	resource_branch #(.data_width(data_width), .handle_width(8), .acc_width(acc_width), .n_channels(n_channels)) mem_stage (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -894,7 +883,7 @@ module dsp_core #(
 	
 	assign svf_data_out = filter_data_out;
 	
-	resource_branch_filter #(.data_width(data_width), .handle_width(8), .full_width(full_width), .n_channels(n_channels)) filter_branch (
+	resource_branch_filter #(.data_width(data_width), .handle_width(8), .acc_width(acc_width), .n_channels(n_channels)) filter_branch (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -964,24 +953,38 @@ module dsp_core #(
 	genvar k;
 	generate
 		for (k = 0; k < `N_INSTR_BRANCHES; k = k + 1) begin : commit_stages
-			commit_stage #(.data_width(data_width), .n_blocks(n_blocks)) commit_stage_inst
-				(.clk(clk), .enable(enable_core), .reset(reset | resetting), 
-				
-				  .in_valid(out_valid_final_stages[k]),  .in_ready(in_ready_commit_stage[k]), 
-				 .out_valid(out_valid_commit_stage[k]),  .out_ready(in_ready_commit_master[k]),
-                 
-						 .block_in(block_out_final_stages[k]),		 .block_out(block_out_commit_stage[k]),
-						.result_in   (result_final_stages[k]),		.result_out   (result_commit_stage[k]),
-					  .dest_in		 (dest_final_stages[k]),				 .dest_out(dest_commit_stage[k]),
-					 .commit_id_in(commit_id_final_stages[k]),	 .commit_id_out(commit_id_commit_stage[k]),
-				 .commit_flag_in(commit_flag_final_stages[k]), .commit_flag_out(commit_flag_commit_stage[k]));
+			if (k != `INSTR_BRANCH_MAC) begin
+				commit_stage #(.data_width(data_width), .n_blocks(n_blocks)) commit_stage_inst
+					(.clk(clk), .enable(enable_core), .reset(reset | resetting), 
+					
+					  .in_valid(out_valid_final_stages[k]),  .in_ready(in_ready_commit_stage[k]), 
+					 .out_valid(out_valid_commit_stage[k]),  .out_ready(in_ready_commit_master[k]),
+					 
+							 .block_in(block_out_final_stages[k]),		   .block_out(block_out_commit_stage[k]),
+							.result_in   (result_final_stages[k]),  	  .result_out   (result_commit_stage[k]),
+						  .dest_in		   (dest_final_stages[k]),	    		 .dest_out(dest_commit_stage[k]),
+						 .commit_id_in(commit_id_final_stages[k]),	 .  commit_id_out(commit_id_commit_stage[k]),
+					 .commit_flag_in(commit_flag_final_stages[k]), .commit_flag_out(commit_flag_commit_stage[k]));
+			end
 		end
 	endgenerate
+	
+	commit_stage #(.data_width(acc_width), .n_blocks(n_blocks)) commit_stage_mac
+					(.clk(clk), .enable(enable_core), .reset(reset | resetting), 
+					
+					  .in_valid(out_valid_final_stages[`INSTR_BRANCH_MAC]),  .in_ready(in_ready_commit_stage[`INSTR_BRANCH_MAC]), 
+					 .out_valid(out_valid_commit_stage[`INSTR_BRANCH_MAC]),  .out_ready(in_ready_commit_master[`INSTR_BRANCH_MAC]),
+					 
+							 .block_in(block_out_final_stages[`INSTR_BRANCH_MAC]),		   .block_out(block_out_commit_stage[`INSTR_BRANCH_MAC]),
+							.result_in   					  (result_mac_branch),  	  				.result_out   (commit_result_mac_branch),
+						  .dest_in		   (dest_final_stages[`INSTR_BRANCH_MAC]),	    		 .dest_out(dest_commit_stage[`INSTR_BRANCH_MAC]),
+						 .commit_id_in(commit_id_final_stages[`INSTR_BRANCH_MAC]),	 .  commit_id_out(commit_id_commit_stage[`INSTR_BRANCH_MAC]),
+					 .commit_flag_in(commit_flag_final_stages[`INSTR_BRANCH_MAC]), .commit_flag_out(commit_flag_commit_stage[`INSTR_BRANCH_MAC]));
 	
 	/*****************/
 	/* Commit master */
 	/*****************/
-	commit_master #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) commit_master (
+	commit_master #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) commit_master (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -1006,6 +1009,7 @@ module dsp_core #(
 		.channel_write_val(channel_write_val),
 		.channel_write_enable(channel_write_enable),
 		
+		.result_mac_branch(commit_result_mac_branch),
 		.accumulator_write_val(accumulator_write_val),
 		.accumulator_add_enable(accumulator_add_enable),
 		.accumulator_write_enable(accumulator_write_enable)
@@ -1099,7 +1103,7 @@ module dsp_core #(
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_router;
 	wire [3:0] flags_out_router;
 	wire commit_flag_out_router;
-	wire signed [full_width - 1 : 0] accumulator_out_router;
+	wire signed [acc_width - 1 : 0] accumulator_out_router;
 	assign out_ready_router[0] = in_ready_madd;
 	assign out_ready_router[1] = in_ready_mac;
 	assign out_ready_router[2] = in_ready_misc;
@@ -1107,7 +1111,6 @@ module dsp_core #(
 	assign out_ready_router[4] = in_ready_lut;
 	assign out_ready_router[5] = in_ready_mem;
 	assign out_ready_router[6] = in_ready_filt;
-	
 	
 	/************/
 	/* Branches */
@@ -1120,7 +1123,6 @@ module dsp_core #(
 	wire in_ready_delay;
 	wire [data_width - 1 : 0] arg_a_out_delay;
 	wire [data_width - 1 : 0] arg_b_out_delay;
-	wire [full_width - 1 : 0] result_out_delay;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_delay;
 	wire [3:0] flags_out_delay;
 	
@@ -1128,13 +1130,11 @@ module dsp_core #(
 	wire in_ready_lut;
 	wire [data_width - 1 : 0] arg_a_out_lut;
 	wire [data_width - 1 : 0] arg_b_out_lut;
-	wire [full_width - 1 : 0] result_out_lut;
 	wire [3:0] flags_out_lut;
 	
 	// Memory branch
 	wire [data_width   - 1 : 0] arg_a_out_mem;
 	wire [data_width   - 1 : 0] arg_b_out_mem;
-	wire [full_width   - 1 : 0] result_out_mem;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_mem;
 	wire mem_read_req;
 	reg  mem_read_valid;
@@ -1161,10 +1161,12 @@ module dsp_core #(
 	wire [`N_INSTR_BRANCHES - 1 : 0] out_valid_commit_stage;
 	wire [$clog2(n_blocks)  - 1 : 0] block_out_final_stages [`N_INSTR_BRANCHES - 1 : 0];
 	wire [$clog2(n_blocks)  - 1 : 0] block_out_commit_stage [`N_INSTR_BRANCHES - 1 : 0];
-	wire [full_width    - 1 : 0] result_final_stages		[`N_INSTR_BRANCHES - 1 : 0];
-	wire [full_width    - 1 : 0] result_commit_stage		[`N_INSTR_BRANCHES - 1 : 0];
-	wire [ch_addr_w - 1 : 0] dest_final_stages		[`N_INSTR_BRANCHES - 1 : 0];
-	wire [ch_addr_w - 1 : 0] dest_commit_stage		[`N_INSTR_BRANCHES - 1 : 0];
+	wire signed [data_width - 1 : 0] result_final_stages	[`N_INSTR_BRANCHES - 1 : 0];
+	wire signed [data_width - 1 : 0] result_commit_stage	[`N_INSTR_BRANCHES - 1 : 0];
+	wire signed [acc_width  - 1 : 0] result_mac_branch;
+	wire signed [acc_width  - 1 : 0] commit_result_mac_branch;
+	wire [ch_addr_w - 1 : 0] dest_final_stages				[`N_INSTR_BRANCHES - 1 : 0];
+	wire [ch_addr_w - 1 : 0] dest_commit_stage				[`N_INSTR_BRANCHES - 1 : 0];
 	wire [`COMMIT_ID_WIDTH  - 1 : 0] commit_id_final_stages	[`N_INSTR_BRANCHES - 1 : 0];
 	wire [`COMMIT_ID_WIDTH  - 1 : 0] commit_id_commit_stage	[`N_INSTR_BRANCHES - 1 : 0];
 	wire [`N_INSTR_BRANCHES - 1 : 0] commit_flag_final_stages;

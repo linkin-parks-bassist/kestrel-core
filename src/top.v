@@ -462,22 +462,23 @@ module bram_standin #(parameter data_width = 16, parameter mem_size = 8192, para
 			mem[mem_write_addr] <= mem_write_val;
 	end
 	
-	localparam IDLE = 3'd0;
-	localparam READ = 3'd1;
-	localparam REF 	= 3'd2;
+	localparam IDLE 		= 3'd0;
+	localparam READ_WAIT 	= 3'd1;
+	localparam READ_DONE 	= 3'd2;
+	localparam WRITE_BUSY 	= 3'd3;
+	localparam REF 			= 3'd4;
 	
 	reg [2:0] state;
 	
 	assign busy = (state != IDLE);
 	
-	reg read_wait;
 	wire addr_valid = addr < mem_size;
 	
 	reg [2:0] sim_ref_ctr;
 	
 	always @(posedge clk) begin
+		mem_write_enable <= 0;
 		read_valid <= 0;
-		read_wait <= 0;
 		
 		if (reset) begin
 			state <= IDLE;
@@ -488,26 +489,34 @@ module bram_standin #(parameter data_width = 16, parameter mem_size = 8192, para
 				IDLE: begin
 					if (read && addr_valid) begin
 						mem_read_addr <= addr;
-						read_wait <= 1;
-						state <= READ;
+						
 						read_count <= read_count + 1;
+						state <= READ_WAIT;
 					end else if (write && addr_valid) begin
 						mem_write_val <= data_in;
 						mem_write_addr <= addr;
 						mem_write_enable <= 1;
 						write_count <= write_count + 1;
+						
+						state <= WRITE_BUSY;
 					end else if (refresh) begin
 						sim_ref_ctr <= 3;
 						state <= REF;
 					end
 				end
 				
-				READ: begin
-					if (!read_wait) begin
-						data_out <= mem_read_val;
-						read_valid <= 1;
-						state <= IDLE;
-					end
+				READ_WAIT: begin
+					state <= READ_DONE;
+				end
+				
+				READ_DONE: begin
+					data_out <= mem_read_val;
+					read_valid <= 1;
+					state <= IDLE;
+				end
+				
+				WRITE_BUSY: begin
+					state <= IDLE;
 				end
 			
 				REF: begin

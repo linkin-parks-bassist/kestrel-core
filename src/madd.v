@@ -2,7 +2,7 @@
 
 `default_nettype none
 
-module multiply_stage #(parameter data_width = 16, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16)
+module multiply_stage #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,
@@ -27,9 +27,9 @@ module multiply_stage #(parameter data_width = 16, parameter n_blocks = 256, par
 		input wire saturate_disable_in,
 		output reg saturate_disable_out,
 		
-		input wire signed [	data_width - 1 : 0] arg_a_in,
-		input wire signed [	data_width - 1 : 0] arg_b_in,
-		output reg signed [full_width - 1 : 0] product_out,
+		input wire signed [data_width - 1 : 0] arg_a_in,
+		input wire signed [data_width - 1 : 0] arg_b_in,
+		output reg signed [acc_width - 1 : 0] product_out,
 		
 		input wire signed [data_width - 1 : 0] arg_c_in,
 		output reg signed [data_width - 1 : 0] arg_c_out,
@@ -51,8 +51,8 @@ module multiply_stage #(parameter data_width = 16, parameter n_blocks = 256, par
 	wire take_in  = in_ready & in_valid;
 	wire take_out = out_valid & out_ready;
 	
-	wire signed [full_width - 1 : 0] product_signed   = $signed(arg_a_in)   * $signed(arg_b_in);
-	wire 	    [full_width - 1 : 0] product_unsigned = $unsigned(arg_a_in) * $unsigned(arg_b_in);
+	wire signed [acc_width - 1 : 0] product_signed   =   $signed(arg_a_in)   * $signed(arg_b_in);
+	wire 	    [acc_width - 1 : 0] product_unsigned = $unsigned(arg_a_in) * $unsigned(arg_b_in);
 
 	always @(posedge clk) begin
 		out_valid <= out_valid;
@@ -95,7 +95,7 @@ module multiply_stage #(parameter data_width = 16, parameter n_blocks = 256, par
 	end
 endmodule
 
-module shift_stage_1 #(parameter data_width = 16, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16, parameter bit shift_type = `SHIFT_TYPE_ARSH)
+module shift_stage_1 #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16, parameter bit shift_type = `SHIFT_TYPE_ARSH)
 	(
 		input wire clk,
 		input wire reset,
@@ -121,8 +121,8 @@ module shift_stage_1 #(parameter data_width = 16, parameter n_blocks = 256, para
 		input wire saturate_disable_in,
 		output reg saturate_disable_out,
 		
-		input wire signed [full_width - 1 : 0] product_in,
-		output reg signed [full_width - 1 : 0] product_out,
+		input wire signed [acc_width - 1 : 0] product_in,
+		output reg signed [acc_width - 1 : 0] product_out,
 		
 		output reg rounding_bit,
 		
@@ -146,8 +146,8 @@ module shift_stage_1 #(parameter data_width = 16, parameter n_blocks = 256, para
 	wire take_in  = in_ready & in_valid;
 	wire take_out = out_valid & out_ready;
 	
-	wire signed [full_width - 1 : 0] sh1;
-	wire signed [full_width - 1 : 0] sh2;
+	wire signed [2 * data_width - 1 : 0] sh1;
+	wire signed [2 * data_width - 1 : 0] sh2;
 	
 	generate
 		if (shift_type == `SHIFT_TYPE_LSH) begin
@@ -204,7 +204,7 @@ module shift_stage_1 #(parameter data_width = 16, parameter n_blocks = 256, para
 	end
 endmodule
 
-module shift_stage_2 #(parameter data_width = 16, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16, parameter bit shift_type = `SHIFT_TYPE_ARSH)
+module shift_stage_2 #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16, parameter bit shift_type = `SHIFT_TYPE_ARSH)
 	(
 		input wire clk,
 		input wire reset,
@@ -228,8 +228,8 @@ module shift_stage_2 #(parameter data_width = 16, parameter n_blocks = 256, para
 		input wire saturate_disable_in,
 		output reg saturate_disable_out,
 		
-		input wire signed [full_width - 1 : 0] product_in,
-		output reg signed [full_width - 1 : 0] product_out,
+		input wire signed [acc_width - 1 : 0] product_in,
+		output reg signed [acc_width - 1 : 0] product_out,
 		
 		input wire rounding_bit,
 		
@@ -253,8 +253,8 @@ module shift_stage_2 #(parameter data_width = 16, parameter n_blocks = 256, para
 	wire take_in  = in_ready & in_valid;
 	wire take_out = out_valid & out_ready;
 	
-	wire signed [full_width - 1 : 0] sh1;
-	wire signed [full_width - 1 : 0] sh2;
+	wire signed [acc_width - 1 : 0] sh1;
+	wire signed [acc_width - 1 : 0] sh2;
 	
 	generate
 		if (shift_type == `SHIFT_TYPE_LSH) begin
@@ -295,7 +295,7 @@ module shift_stage_2 #(parameter data_width = 16, parameter n_blocks = 256, para
 	end
 endmodule
 
-module add_stage #(parameter data_width = 16, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16)
+module add_stage #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,
@@ -316,10 +316,10 @@ module add_stage #(parameter data_width = 16, parameter n_blocks = 256, paramete
 		
 		input wire signedness_in,
 		
-		input wire signed [full_width - 1 : 0] product_in,
+		input wire signed [acc_width  - 1 : 0] product_in,
 		input wire signed [data_width - 1 : 0] arg_c_in,
 		
-		output reg signed [full_width - 1 : 0] result_out,
+		output reg signed [acc_width : 0] result_out,
 		
 		input wire [ch_addr_w - 1 : 0] dest_in,
 		output reg [ch_addr_w - 1 : 0] dest_out,
@@ -338,9 +338,9 @@ module add_stage #(parameter data_width = 16, parameter n_blocks = 256, paramete
 	wire take_in  =  in_ready & in_valid;
 	wire take_out = out_valid & out_ready;
 	
-	wire signed [full_width - 1 : 0] arg_c_ext = {{(full_width - data_width){signedness_in & arg_c_in[data_width-1]}}, arg_c_in};
+	wire signed [2 * data_width - 1 : 0] arg_c_ext = {{(data_width){signedness_in & arg_c_in[data_width-1]}}, arg_c_in};
 	
-	wire signed [full_width - 1 : 0] result = product_in + arg_c_ext;
+	wire signed [2 * data_width : 0] result = product_in + arg_c_ext;
 
 	always @(posedge clk) begin
 		if (reset) begin
@@ -364,7 +364,7 @@ module add_stage #(parameter data_width = 16, parameter n_blocks = 256, paramete
 	end
 endmodule
 
-module saturate_stage #(parameter data_width = 16, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16)
+module saturate_stage #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,
@@ -379,8 +379,8 @@ module saturate_stage #(parameter data_width = 16, parameter n_blocks = 256, par
 		
 		input wire saturate_disable_in,
 		
-		input wire signed [full_width - 1 : 0] result_in,
-		output reg signed [full_width - 1 : 0] result_out,
+		input wire signed [acc_width : 0] result_in,
+		output reg signed [acc_width - 1 : 0] result_out,
 		
 		input wire [ch_addr_w - 1 : 0] dest_in,
 		output reg [ch_addr_w - 1 : 0] dest_out,
@@ -402,10 +402,17 @@ module saturate_stage #(parameter data_width = 16, parameter n_blocks = 256, par
 	wire take_in  =  in_ready & in_valid;
 	wire take_out = out_valid & out_ready;
 	
-	localparam signed [full_width - 1 : 0] sat_max = ( 1 << (data_width - 1)) - 1;
-	localparam signed [full_width - 1 : 0] sat_min = (-1 << (data_width - 1));
+	localparam signed [acc_width : 0] sat_max = ( 1 << (data_width - 1)) - 1;
+	localparam signed [acc_width : 0] sat_min = (-1 << (data_width - 1));
 	
-	wire signed [full_width - 1 : 0] result_in_sat = (result_in > sat_max) ? sat_max : ((result_in < sat_min) ? sat_min : result_in);
+	wire saturate_high = (result_in > sat_max);
+	wire saturate_low  = (result_in < sat_min);
+	wire saturate = saturate_high | saturate_low;
+	
+	wire signed [acc_width - 1 : 0] result_in_sat = (result_in > sat_max) ?
+																			sat_max[acc_width - 1 : 0] :
+																			((result_in < sat_min) ? sat_min[acc_width - 1 : 0] :
+																									  result_in[acc_width - 1 : 0]);
 
 	always @(posedge clk) begin
 		if (reset) begin
@@ -421,7 +428,7 @@ module saturate_stage #(parameter data_width = 16, parameter n_blocks = 256, par
 			if (take_in) begin
 				out_valid <= 1;
 				
-				result_out <= (saturate_disable_in) ? result_in : result_in_sat;
+				result_out <= (saturate_disable_in) ? result_in[acc_width - 1 : 0] : result_in_sat;
 				
 				dest_out 	  	<= dest_in;
 				
@@ -436,7 +443,7 @@ module saturate_stage #(parameter data_width = 16, parameter n_blocks = 256, par
 	end
 endmodule
 
-module mac_pipeline #(parameter data_width = 16, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16, parameter bit shift_type = `SHIFT_TYPE_ARSH)
+module mac_pipeline #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16, parameter bit shift_type = `SHIFT_TYPE_ARSH)
 	(
 		input wire clk,
 		input wire reset,
@@ -464,7 +471,7 @@ module mac_pipeline #(parameter data_width = 16, parameter n_blocks = 256, param
 		input  wire signed [data_width - 1 : 0] arg_c_in,
 		output wire signed [data_width - 1 : 0] arg_c_out,
 		
-		output wire signed [full_width - 1 : 0] result_out,
+		output wire signed [acc_width - 1 : 0] result_out,
 		
 		input  wire [ch_addr_w - 1 : 0] dest_in,
 		output wire [ch_addr_w - 1 : 0] dest_out,
@@ -489,14 +496,14 @@ module mac_pipeline #(parameter data_width = 16, parameter n_blocks = 256, param
 	wire signed [data_width - 1 : 0] arg_a_out_muls;
 	wire signed [data_width - 1 : 0] arg_b_out_muls;
 	wire signed [data_width - 1 : 0] arg_c_out_muls;
-	wire signed [full_width - 1 : 0] product_out_muls;
-	wire signed [full_width - 1 : 0] accumulator_out_muls;
+	wire signed [acc_width  - 1 : 0] product_out_muls;
+	wire signed [acc_width - 1 : 0] accumulator_out_muls;
 	wire [ch_addr_w - 1 : 0] dest_out_muls;
 	wire writes_accumulator_out_muls;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_muls;
 	wire commit_flag_out_muls;
 	
-	multiply_stage #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) multiply_stage
+	multiply_stage #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) multiply_stage
 		(
 			.clk(clk),
 			.reset(reset),
@@ -553,15 +560,15 @@ module mac_pipeline #(parameter data_width = 16, parameter n_blocks = 256, param
 	wire signed [data_width - 1 : 0] arg_a_out_sh1;
 	wire signed [data_width - 1 : 0] arg_b_out_sh1;
 	wire signed [data_width - 1 : 0] arg_c_out_sh1;
-	wire signed [full_width - 1 : 0] result_out_sh1;
-	wire signed [full_width - 1 : 0] accumulator_out_sh1;
+	wire signed [acc_width  - 1 : 0] result_out_sh1;
+	wire signed [acc_width - 1 : 0] accumulator_out_sh1;
 	wire [ch_addr_w - 1 : 0] dest_out_sh1;
 	wire writes_accumulator_out_sh1;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_sh1;
 	wire commit_flag_out_sh1;
 	wire rounding_bit;
 
-	shift_stage_1 #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .shift_type(shift_type)) shift_1
+	shift_stage_1 #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .shift_type(shift_type)) shift_1
 		(
 			.clk(clk),
 			.reset(reset),
@@ -608,7 +615,7 @@ module mac_pipeline #(parameter data_width = 16, parameter n_blocks = 256, param
 	
 	wire in_ready_sh2;
 
-	shift_stage_2 #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .shift_type(shift_type)) shift_2
+	shift_stage_2 #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .shift_type(shift_type)) shift_2
 		(
 			.clk(clk),
 			.reset(reset),
@@ -653,7 +660,7 @@ module mac_pipeline #(parameter data_width = 16, parameter n_blocks = 256, param
 	
 endmodule
 
-module madd_pipeline #(parameter data_width = 16, parameter n_blocks = 256, parameter full_width = 2 * data_width + 8, parameter n_channels = 16)
+module madd_pipeline #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,
@@ -678,7 +685,7 @@ module madd_pipeline #(parameter data_width = 16, parameter n_blocks = 256, para
 		input wire signed [data_width - 1 : 0] arg_b_in,
 		input wire signed [data_width - 1 : 0] arg_c_in,
 		
-		output wire signed [full_width - 1 : 0] result_out,
+		output wire signed [data_width - 1 : 0] result_out,
 		
 		input  wire [ch_addr_w - 1 : 0] dest_in,
 		output wire [ch_addr_w - 1 : 0] dest_out,
@@ -698,13 +705,13 @@ module madd_pipeline #(parameter data_width = 16, parameter n_blocks = 256, para
 	wire signedness_out_mac;
 	wire saturate_disable_out_mac;
 	wire signed [data_width - 1 : 0] arg_c_out_mac;
-	wire signed [full_width - 1 : 0] accumulator_out_mac;
-	wire signed [full_width - 1 : 0] result_out_mac;
+	wire signed [acc_width - 1 : 0] accumulator_out_mac;
+	wire signed [acc_width - 1 : 0] result_out_mac;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_mac;
 	wire [ch_addr_w - 1 : 0] dest_out_mac;
 	wire commit_flag_out_mac;
 
-	mac_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) madd_main
+	mac_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) madd_main
 	(
 		.clk(clk),
 		.reset(reset),
@@ -749,12 +756,12 @@ module madd_pipeline #(parameter data_width = 16, parameter n_blocks = 256, para
 	wire saturate_disable_out_add;
 	wire in_ready_add;
 	wire out_valid_add;
-	wire [full_width - 1 : 0] result_out_add;
+	wire [acc_width : 0] result_out_add;
 	wire [ch_addr_w - 1 : 0] dest_out_add;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out_add;
 	wire commit_flag_out_add;
 
-	add_stage #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) add_stage
+	add_stage #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) add_stage
 		(
 			.clk(clk),
 			.reset(reset),
@@ -791,7 +798,7 @@ module madd_pipeline #(parameter data_width = 16, parameter n_blocks = 256, para
 
 	wire in_ready_sats;
 
-	saturate_stage #(.data_width(data_width), .n_blocks(n_blocks), .full_width(full_width), .n_channels(n_channels)) saturate_stage
+	saturate_stage #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) saturate_stage
 		(
 			.clk(clk),
 			.reset(reset),
