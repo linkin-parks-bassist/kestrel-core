@@ -560,6 +560,15 @@ module control_unit
 									data_ready <= 1;
 									state <= READY;
 								end
+								
+								`DATA_REQ_STUCK_FLAGS: begin
+									ctrl_data_out <= `DATA_REQ_STUCK_FLAGS;
+									pipeline_data_req[current_pipeline] <= 1;
+									expecting_pipeline_data <= 1;
+									pipeline_data_req_target <= current_pipeline;
+									readout_n_bytes <= 4;
+									state <= READY;
+								end
 
 								default: begin
 									cmd_err_flag <= 1;
