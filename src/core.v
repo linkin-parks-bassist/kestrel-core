@@ -94,6 +94,18 @@ module dsp_core #(
 		input wire svf_ack
 	);
 	
+	wire [31:0] stuck_flags;
+	
+	wire stuck_bfds;
+	wire stuck_ofs;
+	wire stuck_router;
+	wire stuck_commit_master;
+	
+	assign stuck_flags[0] = stuck_bfds;
+	assign stuck_flags[1] = stuck_ofs;
+	assign stuck_flags[2] = stuck_router;
+	assign stuck_flags[3] = stuck_commit_master;
+	
 	wire [$clog2(n_blocks) - 1 : 0] command_block_target;
 	wire command_reg_target;
 	wire [31 : 0] command_instr_write_val;
@@ -249,6 +261,12 @@ module dsp_core #(
 							data_return_valid <= 1;
 							data_req_active <= 0;
 						end
+					end
+					
+					`DATA_REQ_STUCK_FLAGS: begin
+						data_return <= stuck_flags;
+						data_return_valid <= 1;
+						data_req_active <= 0;
 					end
 					
 					default: begin

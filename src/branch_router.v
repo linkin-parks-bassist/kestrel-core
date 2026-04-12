@@ -1,5 +1,6 @@
 `include "instr_dec.vh"
 `include "core.vh"
+`include "defs.vh"
 
 `default_nettype none
 
@@ -70,8 +71,20 @@ module branch_router #(parameter data_width = 16, parameter n_blocks = 256, para
 		input wire [`N_INSTR_BRANCHES - 1 : 0] branch,
 		
 		input wire [3:0] flags_in,
-		output reg [3:0] flags_out
+		output reg [3:0] flags_out,
+		
+		output wire stuck
 	);
+	
+	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
+	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
+	
+	always @(posedge clk) begin
+		if (reset | (out_valid & out_ready[branch_out]))
+			stuck_ctr <= 0;
+		else if (enable && stuck_ctr < `CYCLES_PER_SAMPLE)
+			stuck_ctr <= stuck_ctr + 1;
+	end
 	
 	reg [`N_INSTR_BRANCHES - 1 : 0] branch_out;
 	

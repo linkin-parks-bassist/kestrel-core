@@ -450,6 +450,7 @@ module dsp_pipeline #(
 			`DATA_REQ_N_BLOCKS:    data_req_target = DATA_REQ_TARGET_CORE;
 			`DATA_REQ_BLOCK_INSTR: data_req_target = DATA_REQ_TARGET_CORE;
 			`DATA_REQ_BLOCK_REG:   data_req_target = DATA_REQ_TARGET_CORE;
+			`DATA_REQ_STUCK_FLAGS: data_req_target = DATA_REQ_TARGET_CORE;
 			
 			`DATA_REQ_N_DELAY_BUF: 	   data_req_target = DATA_REQ_TARGET_DELAY;
 			`DATA_REQ_DELAY_BUF_SIZE:  data_req_target = DATA_REQ_TARGET_DELAY;

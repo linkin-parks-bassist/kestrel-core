@@ -32,8 +32,13 @@ module commit_master #(parameter data_width = 16, parameter n_blocks = 256, para
 		output reg accumulator_write_enable,
 		output reg accumulator_add_enable,
 		
-		output reg [`COMMIT_ID_WIDTH - 1 : 0] next_commit_id
+		output reg [`COMMIT_ID_WIDTH - 1 : 0] next_commit_id,
+		
+		output wire stuck
 	);
+	
+	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
+	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
 	
 	localparam ch_addr_w = $clog2(n_channels);
 	
@@ -68,8 +73,12 @@ module commit_master #(parameter data_width = 16, parameter n_blocks = 256, para
 		
 		result_mac_branch_prev <= result_mac_branch;
 		
+		if (enable && stuck_ctr < `CYCLES_PER_SAMPLE)
+			stuck_ctr <= stuck_ctr + 1;
+		
 		if (reset) begin
 			next_commit_id <= 0;
+			stuck_ctr <= 0;
 		end else if (sample_tick) begin
 			channel_write_addr 		<= 0;
 			channel_write_val  		<= sample_in;
@@ -90,10 +99,12 @@ module commit_master #(parameter data_width = 16, parameter n_blocks = 256, para
 						accumulator_write_val <= result_mac_branch_prev;
 						accumulator_add_enable <= ~acc_overwrite_prev;
 						accumulator_write_enable <= 1;
+						stuck_ctr <= 0;
 					end else begin
 						channel_write_val <= result_prev[j][data_width - 1 : 0];
 						channel_write_addr <= dest_prev[j];
 						channel_write_enable <= 1;
+						stuck_ctr <= 0;
 					end
 				end
 			end

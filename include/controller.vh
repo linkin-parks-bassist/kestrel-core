@@ -31,6 +31,7 @@
 `define COMMAND_CLEAR_TIMEOUT_FLAG	8'd35
 `define COMMAND_CLEAR_BAD_FLAG		8'd36
 `define COMMAND_CLEAR_CMD_ERR_FLAG	8'd37
+`define COMMAND_READ				8'd38
 
 // If we're in a 'waiting' state, but no new data has
 // appeared for a while, then it's likely
@@ -54,3 +55,6 @@
 `define DATA_REQ_DELAY_BUF_GAIN  8'd8
 `define DATA_REQ_DELAY_BUF_LRWA  8'd9
 `define DATA_REQ_SAMPLE_COUNT	 8'd10
+`define DATA_REQ_SDRAM_READ_CNT	 8'd11
+`define DATA_REQ_SDRAM_WRITE_CNT 8'd12
+`define DATA_REQ_STUCK_FLAGS	 8'd13

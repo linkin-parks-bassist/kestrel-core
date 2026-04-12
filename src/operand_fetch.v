@@ -643,8 +643,20 @@ module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256
 		input  wire accumulator_write_enable,
 		
 		input  wire [3:0] flags_in,
-		output wire [3:0] flags_out
+		output wire [3:0] flags_out,
+		
+		output wire stuck
 	);
+	
+	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
+	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
+	
+	always @(posedge clk) begin
+		if (reset | (out_valid & out_ready))
+			stuck_ctr <= 0;
+		else if (enable && stuck_ctr < `CYCLES_PER_SAMPLE)
+			stuck_ctr <= stuck_ctr + 1;
+	end
 	
 	localparam ch_addr_w = $clog2(n_channels);
 	

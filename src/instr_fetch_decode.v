@@ -1,4 +1,5 @@
 `include "instr_dec.vh"
+`include "defs.vh"
 `include "lut.vh"
 `include "core.vh"
 
@@ -28,8 +29,13 @@ module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
 		output reg [31 : 0] instr_out,
 		
 		input wire [3:0] flags_in,
-		output reg [3:0] flags_out
+		output reg [3:0] flags_out,
+		
+		output wire stuck
 	);
+	
+	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
+	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
 	
 	reg in_valid;
 	
@@ -45,10 +51,14 @@ module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
 	reg [3:0] flags_skid;
 	
 	reg [$clog2(n_blocks) - 1 : 0] block_r;
+	reg [$clog2(n_blocks) - 1 : 0] block_read_addr_prev;
 	
 	always @(posedge clk) begin
+		block_read_addr_prev <= block_read_addr;
+		
 		if (reset) begin
 			block_read_addr <= 0;
+			block_read_addr_prev <= 0;
 			in_valid <= 0;
 			out_valid <= 0;
 			skid <= 0;
@@ -56,8 +66,13 @@ module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
 			block_read_addr <= 0;
 			in_valid <= 0;
 			out_valid <= 0;
+			stuck_ctr <= 0;
 			skid <= 0;
 		end else if (enable) begin
+			if (n_blocks_running == 0 || block_read_addr_prev != block_read_addr)
+				stuck_ctr <= 0;
+			else if (stuck_ctr < `CYCLES_PER_SAMPLE)
+				stuck_ctr <= stuck_ctr + 1;
 			
 			in_valid <= 0;
 			
@@ -457,8 +472,13 @@ module block_fetch_decode_stage #(parameter data_width = 16, parameter n_blocks 
 
 		output wire [$clog2(`N_MISC_OPS) - 1 : 0] misc_op_out,
 		
-		output wire [3:0] flags_out
+		output wire [3:0] flags_out,
+		
+		output wire stuck
 	);
+	
+	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
+	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
 	
 	wire out_valid_1;
 	wire [$clog2(n_blocks) - 1 : 0] block_1_out;
@@ -487,7 +507,9 @@ module block_fetch_decode_stage #(parameter data_width = 16, parameter n_blocks 
 		.register_1_out(register_1_1_out),
 		
 		.instr_in(instr_read_val),
-		.instr_out(instr_1_out)
+		.instr_out(instr_1_out),
+		
+		.stuck(stuck)
 	);
 	
 	wire in_ready_2;
