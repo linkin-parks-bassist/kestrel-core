@@ -379,7 +379,6 @@ module control_unit
 									warmup_ctr <= 0;
 									
 									state <= SWAP_WARMUP;
-									busy_flag <= 1;
 								end else begin
 									state <= READY;
 								end
@@ -774,7 +773,6 @@ module control_unit
 				
 				SWAP_WAIT: begin
 					swapping <= 1;
-					timeout_active <= 1;
 					if (!wait_one && !pipelines_swapping) begin
 						current_pipeline <= ~current_pipeline;
 						pipeline_full_reset[front_pipeline] <= 1;
@@ -786,14 +784,12 @@ module control_unit
 				end
 				
 				RESET_WAIT: begin
-					timeout_active <= 1;
 					if (!wait_one && !(|pipeline_resetting)) begin
 						state <= READY;
 					end
 				end
 				
 				INITIAL_RESET_WAIT: begin
-					timeout_active <= 1;
 					if (!wait_one && !(|pipeline_resetting[front_pipeline])) begin
 						state <= READY;
 						pipeline_enables[front_pipeline] <= 1;
