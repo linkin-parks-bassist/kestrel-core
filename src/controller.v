@@ -128,15 +128,15 @@ module control_unit
 
 	wire ready = (state == READY);
 	
-	localparam block_bytes 		= (n_blocks > 256) ? 2 : 1;
-	localparam data_bytes		= (data_width == 24) ? 3 : 2;
-	localparam instr_bytes   	= 4;
-	localparam delay_addr_bytes = 3;
-	localparam max_bytes_needed = 6;
-	localparam filter_coef_bytes = (filter_width > 16) ? 3 : 2;
+	localparam block_bytes 		 = 2;
+	localparam data_bytes		 = 2;
+	localparam instr_bytes   	 = 4;
+	localparam delay_addr_bytes  = 3;
+	localparam max_bytes_needed  = 6;
+	localparam filter_coef_bytes = 3;
 	
-	reg [$clog2(max_bytes_needed) - 1 : 0] byte_ctr;
-	reg [$clog2(max_bytes_needed) - 1 : 0] bytes_needed;
+	reg [$clog2(max_bytes_needed) : 0] byte_ctr;
+	reg [$clog2(max_bytes_needed) : 0] bytes_needed;
 	reg [max_bytes_needed * 8 - 1 : 0] bytes_in;
 	
 	wire [7:0] byte_0_in = bytes_in[7:0];
