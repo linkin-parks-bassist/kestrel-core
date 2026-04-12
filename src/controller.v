@@ -82,8 +82,10 @@ module control_unit
 	assign flags[4] = bad_flag;
 	assign flags[5] = data_ready_flag;
 	assign flags[6] = cmd_err_flag;
+	assign flags[7] = swapping;
 	
 	reg initialised_flag;
+	reg swapping;
 	reg busy_flag;
 	reg timeout_flag;
 	wire programming_flag = programming;
@@ -192,6 +194,7 @@ module control_unit
 		reg_writes_commit <= 0;
 		wait_one <= 0;
 		
+		swapping <= 0;
 		next <= 0;
 		
 		swap_pipelines <= 0;
@@ -742,7 +745,8 @@ module control_unit
 				end
 				
 				SWAP_WARMUP: begin
-					timeout_active <= 0;
+					swapping <= 1;
+					
 					if (warmup_ctr == warmup_cycles) begin
 						if (health) begin
 							swap_pipelines <= 1;
@@ -769,6 +773,7 @@ module control_unit
 				end
 				
 				SWAP_WAIT: begin
+					swapping <= 1;
 					timeout_active <= 1;
 					if (!wait_one && !pipelines_swapping) begin
 						current_pipeline <= ~current_pipeline;
