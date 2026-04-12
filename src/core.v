@@ -104,9 +104,6 @@ module dsp_core #(
 	assign command_block_target =  (command_instr_write) ? ctrl_data_in[$clog2(n_blocks) + 32 - 1 : 32]
 														 : ctrl_data_in[$clog2(n_blocks) + data_width - 1 : data_width];
 	
-	wire [7:0] test = ctrl_data_in[data_width + 8 - 1 : data_width - 1];
-	wire [$clog2(n_blocks) - 1 : 0] test2 = ctrl_data_in[$clog2(n_blocks) + data_width + 8 - 1 : data_width + 8];
-	
 	assign command_reg_write_val = ctrl_data_in[data_width - 1 : 0];
 	assign command_reg_target  	 = command_reg_1_write;
 	
@@ -211,15 +208,8 @@ module dsp_core #(
 	wire [block_addr_w - 1 : 0] block_data_req_addr;
 	wire [7 : 0] block_data_req_reg;
 	
-	generate
-		if (n_blocks > 256) begin
-			assign block_data_req_addr = data_req_ctrl_data_r[23:8];
-			assign block_data_req_reg = data_req_ctrl_data_r[31:24];
-		end else begin
-			assign block_data_req_addr = data_req_ctrl_data_r[15:8];
-			assign block_data_req_reg = data_req_ctrl_data_r[23:16];
-		end
-	endgenerate
+	assign block_data_req_addr = data_req_ctrl_data_r[23:8];
+	assign block_data_req_reg = data_req_ctrl_data_r[31:24];
 	
 	always @(posedge clk) begin
 		data_return_valid <= 0;
