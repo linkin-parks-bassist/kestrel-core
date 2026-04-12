@@ -84,13 +84,12 @@ module sdram
 `endif
 
 `ifdef naive_sim
-reg [15 : 0] sim_mem [(1 << 20) : 0];
+reg [15 : 0] sim_mem [(1 << 21) : 0];
 
 reg  [15 : 0] sim_mem_write_val;
 reg  [15 : 0] sim_mem_read_val;
-reg  [20 : 0] sim_mem_write_addr;
-reg  [20 : 0] sim_mem_read_addr;
-reg  [20 : 0] sim_addr_latched;
+reg  [21 : 0] sim_mem_write_addr;
+reg  [21 : 0] sim_mem_read_addr;
 
 reg sim_mem_write_enable;
 
@@ -118,7 +117,7 @@ wire [data_width - 1 : 0] next_dout =  sim_mem_read_val;
 wire [data_width - 1 : 0] next_dout =  off ? dq_in[2 * data_width - 1 : data_width] : dq_in[data_width - 1 : 0];
 `endif
 
-assign dout = data_ready ? next_dout : dout_buf;
+assign dout = dout_buf;
 assign dout32 = dq_in;
 assign SDRAM_CLK = clk_sdram;
 assign SDRAM_CKE = 1'b1;
@@ -243,11 +242,13 @@ always @(posedge clk) begin
             read_count <= read_count + 1;
         end
         {READ, T_RCD+CAS}: begin
-            data_ready <= 1'b1;
+            dout_buf <= dq_in;
         end
         {READ, T_RCD+CAS+4'd1}: begin
+            data_ready <= 1'b1;
+        end
+        {READ, T_RCD+CAS+4'd2}: begin
             data_ready <= 1'b0;
-            dout_buf <= next_dout;
             busy <= 0;
             state <= IDLE;
         end

@@ -338,7 +338,7 @@ module top #(
 	localparam sdram_size = (1024 * 14);
 	localparam sdram_addr_width = $clog2(sdram_size);
 	`else
-	localparam sdram_addr_width = 20;
+	localparam sdram_addr_width = 21;
 	localparam sdram_size = (1 << sdram_addr_width);
 	`endif
 	

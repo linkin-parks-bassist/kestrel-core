@@ -269,6 +269,7 @@ module delay_master #(parameter data_width  = 16,
 		write_req_posedge_latched <= write_req_posedge | write_req_posedge_latched;
 		
 		mem_req <= 0;
+		
 		if (reset) begin
 			state <= IDLE;
 			buf_data_invalid <= 0;
@@ -385,7 +386,6 @@ module delay_master #(parameter data_width  = 16,
 					mem_addr <= delay_addr;
 					mem_req  <= 1;
                     mem_req_type <= 0;
-                    wait_one <= 1;
                     
                     buf_last_read_addr[read_handle_r] <= delay_addr;
 					
