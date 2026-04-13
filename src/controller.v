@@ -702,15 +702,15 @@ module control_unit
 							ctrl_data_out <= {bytes_in[`CTRL_DATA_BUS_WIDTH - 8 - 1 : 0], data_req_type};
 							
 							case (data_req_type)
-								`COMMAND_GET_BLOCK_INSTR: 		readout_n_bytes <= 4;
-								`COMMAND_GET_BLOCK_REG: 		readout_n_bytes <= data_bytes;
-								`COMMAND_GET_DELAY_BUF_SIZE: 	readout_n_bytes <= 3;
-								`COMMAND_GET_DELAY_BUF_DELAY: 	readout_n_bytes <= 3;
-								`COMMAND_GET_DELAY_BUF_ADDR: 	readout_n_bytes <= 3;
-								`COMMAND_GET_DELAY_BUF_POS: 	readout_n_bytes <= 3;
-								`COMMAND_GET_DELAY_BUF_GAIN: 	readout_n_bytes <= 2;
-								`COMMAND_GET_DELAY_BUF_LRWA: 	readout_n_bytes <= 4;
-								default:						readout_n_bytes <= 2;
+								`DATA_REQ_BLOCK_INSTR: 		readout_n_bytes <= 4;
+								`DATA_REQ_BLOCK_REG: 		readout_n_bytes <= data_bytes;
+								`DATA_REQ_DELAY_BUF_SIZE: 	readout_n_bytes <= 3;
+								`DATA_REQ_DELAY_BUF_DELAY: 	readout_n_bytes <= 3;
+								`DATA_REQ_DELAY_BUF_ADDR: 	readout_n_bytes <= 3;
+								`DATA_REQ_DELAY_BUF_POS: 	readout_n_bytes <= 3;
+								`DATA_REQ_DELAY_BUF_GAIN: 	readout_n_bytes <= 2;
+								`DATA_REQ_DELAY_BUF_LRWA: 	readout_n_bytes <= 4;
+								default:					readout_n_bytes <= 2;
 							endcase
 							
 							pipeline_data_req_target <= current_pipeline;
