@@ -101,8 +101,8 @@ module control_unit
 	reg pipeline_data_req_target;
 	
 	reg returning_data;
-	reg [3:0] readout_n_bytes;
-	reg [2:0] readout_index;
+	reg [4:0] readout_n_bytes;
+	reg [4:0] readout_index;
 	reg [8 * 8 -  1 : 0] returned_data;
 	
 	assign spi_byte_out = returning_data ? returned_data[8 * readout_index +: 8] : flags;
@@ -250,6 +250,7 @@ module control_unit
 			timeout_ctr <= 0;
             timeout_max <= `CONTROLLER_TIMEOUT_CYCLES;
             
+            data_ready		  <= 0;
 			returning_data 	  <= 0;
 			readout_n_bytes   <= 0;
 			readout_index 	  <= 0;
@@ -539,7 +540,7 @@ module control_unit
 								end
 								
 								`DATA_REQ_SAMPLE_COUNT: begin
-									ctrl_data_out <= `DATA_REQ_SAMPLE_COUNT;
+									ctrl_data_out[7:0] <= `DATA_REQ_SAMPLE_COUNT;
 									pipeline_data_req[current_pipeline] <= 1;
 									expecting_pipeline_data <= 1;
 									pipeline_data_req_target <= current_pipeline;
@@ -562,7 +563,7 @@ module control_unit
 								end
 								
 								`DATA_REQ_STUCK_FLAGS: begin
-									ctrl_data_out <= `DATA_REQ_STUCK_FLAGS;
+									ctrl_data_out[7:0] <= `DATA_REQ_STUCK_FLAGS;
 									pipeline_data_req[current_pipeline] <= 1;
 									expecting_pipeline_data <= 1;
 									pipeline_data_req_target <= current_pipeline;
@@ -696,7 +697,7 @@ module control_unit
 						end
 						
 						`COMMAND_READ: begin
-							ctrl_data_out <= (bytes_in << 8) | data_req_type;
+							ctrl_data_out <= {bytes_in[`CTRL_DATA_BUS_WIDTH - 8 - 1 : 0], data_req_type};
 							
 							case (data_req_type)
 								`COMMAND_GET_BLOCK_INSTR: 		readout_n_bytes <= 4;
