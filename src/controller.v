@@ -300,8 +300,10 @@ module control_unit
 			// Ignore null bytes when not actively recieving data;
 			// they are used for reading the flags, so drain them
 			// from the FIFO before it fills up
-			if (state != READY && state != LISTEN && in_valid && in_byte == 0)
+			if (state != LISTEN && in_valid && in_byte == 8'hff) begin
 				next <= 1;
+				wait_one <= 1;
+			end
 			
 			case (state)
 				READY: begin
