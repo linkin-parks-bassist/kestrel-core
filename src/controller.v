@@ -696,7 +696,7 @@ module control_unit
 						end
 						
 						`COMMAND_READ: begin
-							ctrl_data_out <= bytes_in << 8 | data_req_type;
+							ctrl_data_out <= (bytes_in << 8) | data_req_type;
 							
 							case (data_req_type)
 								`COMMAND_GET_BLOCK_INSTR: 		readout_n_bytes <= 4;
