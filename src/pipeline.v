@@ -463,7 +463,6 @@ module dsp_pipeline #(
 			`DATA_REQ_N_BLOCKS:    data_req_target = DATA_REQ_TARGET_CORE;
 			`DATA_REQ_BLOCK_INSTR: data_req_target = DATA_REQ_TARGET_CORE;
 			`DATA_REQ_BLOCK_REG:   data_req_target = DATA_REQ_TARGET_CORE;
-			`DATA_REQ_STUCK_FLAGS: data_req_target = DATA_REQ_TARGET_CORE;
 			
 			`DATA_REQ_N_DELAY_BUF: 	   data_req_target = DATA_REQ_TARGET_DELAY;
 			`DATA_REQ_DELAY_BUF_SIZE:  data_req_target = DATA_REQ_TARGET_DELAY;
@@ -489,10 +488,11 @@ module dsp_pipeline #(
 		end else begin
 			if (data_req) begin
 				data_req_ctrl_data_r <= ctrl_data_in;
-				data_req_active <= data_req_target != DATA_REQ_TARGET_NONE;
+				data_req_active <= 1;
 				data_req_target_r <= data_req_target;
 				
 				if (data_req_target == DATA_REQ_TARGET_NONE) begin
+					data_req_active <= 0;
 					case (ctrl_data_in[7:0])
 						`DATA_REQ_SAMPLE_COUNT: begin
 							data_return <= sample_ctr;

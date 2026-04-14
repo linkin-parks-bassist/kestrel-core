@@ -197,7 +197,6 @@ module delay_master #(parameter data_width  = 16,
 	
 	reg [buf_info_width - 1 : 0] buf_info_read;
 	reg [buf_info_width - 1 : 0] buf_info_write_data;
-	reg [buf_info_width - 1 : 0] buf_info_cuck_data;
 	reg [handle_width   - 1 : 0] buf_info_write_handle;
 	reg [handle_width   - 1 : 0] buf_info_read_handle;
 	reg [handle_width   - 1 : 0] buf_info_read_handle_prev;
@@ -309,12 +308,13 @@ module delay_master #(parameter data_width  = 16,
 			position <= 0;
 			gain <= 0;
 			wrapped <= 0;
-			buf_info_write_data <= 0;
-			buf_info_cuck_data <= 0;
-			buf_info_write_handle <= 0;
-			buf_info_read_handle <= 0;
-			buf_info_write_enable <= 0;
-			buf_data_invalid <= 0;
+			
+			buf_info_write_data 	<= 0;
+			buf_info_write_handle 	<= 0;
+			buf_info_read_handle 	<= 0;
+			buf_info_write_enable 	<= 0;
+			buf_data_invalid 		<= 0;
+			
 			buffer_initd <= 0;
 			alloc_addr <= 0;
 			n_buffers_allocd <= 0;

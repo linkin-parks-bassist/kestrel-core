@@ -511,27 +511,27 @@ module control_unit
 								end
 								
 								`DATA_REQ_DELAY_BUF_SIZE: begin
-									bytes_needed <= 2 + 1;
+									bytes_needed <= 1 + 1;
 								end
 								
 								`DATA_REQ_DELAY_BUF_DELAY: begin
-									bytes_needed <= 2 + 1;
+									bytes_needed <= 1 + 1;
 								end
 								
 								`DATA_REQ_DELAY_BUF_ADDR: begin
-									bytes_needed <= 2 + 1;
+									bytes_needed <= 1 + 1;
 								end
 								
 								`DATA_REQ_DELAY_BUF_POS: begin
-									bytes_needed <= 2 + 1;
+									bytes_needed <= 1 + 1;
 								end
 								
 								`DATA_REQ_DELAY_BUF_GAIN: begin
-									bytes_needed <= 2 + 1;
+									bytes_needed <= 1 + 1;
 								end
 								
 								`DATA_REQ_DELAY_BUF_LRWA: begin
-									bytes_needed <= 2 + 1;
+									bytes_needed <= 1 + 1;
 								end
 								
 								`COMMAND_READ_COMMAND_LOG: begin
