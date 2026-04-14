@@ -227,7 +227,6 @@ module dsp_core #(
 		data_return_valid <= 0;
 	
 		if (reset | resetting) begin
-			data_return_valid <= 0;
 			data_req_active <= 0;
 		end else begin
 			if (data_req) begin

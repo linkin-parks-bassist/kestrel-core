@@ -297,7 +297,7 @@ module control_unit
 				data_ready <= 1;
 			end
 			
-			// Ignore null bytes when not actively recieving data;
+			// Ignore 0xFF bytes when not actively recieving data;
 			// they are used for reading the flags, so drain them
 			// from the FIFO before it fills up
 			if (state != LISTEN && in_valid && in_byte == 8'hff) begin
@@ -424,13 +424,14 @@ module control_unit
 								if (returning_data) begin
 									cmd_err_flag <= 0;
 									if (readout_index == 0) begin
-										data_ready <= 0;
+										cmd_err_flag <= 1;
 									end else begin
 										readout_index <= readout_index - 1;
 										returning_data <= 1;
 									end
 								end else begin
 									if (data_ready) begin
+										data_ready <= 0;
 										returning_data <= 1;
 										readout_index <= readout_n_bytes - 1;
 									end else begin

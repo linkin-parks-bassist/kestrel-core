@@ -65,7 +65,7 @@ module delay_master #(parameter data_width  = 16,
 	reg  [`CTRL_DATA_BUS_WIDTH - 1 : 0] data_req_ctrl_data_r;
 	wire [7:0] data_req_type = data_req_ctrl_data_r[7:0];
 	
-	wire [15:0] data_req_handle = data_req_ctrl_data_r[23:8];
+	wire [handle_width - 1 : 0] data_req_handle = data_req_ctrl_data_r[8 +: handle_width];
 	
 	reg [addr_width - 1 : 0] buf_last_write_addr [n_buffers - 1 : 0];
 	reg [addr_width - 1 : 0] buf_last_read_addr  [n_buffers - 1 : 0];
@@ -74,7 +74,6 @@ module delay_master #(parameter data_width  = 16,
 		data_return_valid <= 0;
 	
 		if (reset) begin
-			data_return_valid <= 0;
 			data_req_active <= 0;
 		end else begin
 			if (data_req) begin
@@ -89,7 +88,7 @@ module delay_master #(parameter data_width  = 16,
 					end
 					
 					`DATA_REQ_DELAY_BUF_SIZE: begin
-						if (buf_info_read_handle_prev_prev == data_req_ctrl_data_r[23:8]) begin
+						if (buf_info_read_handle_prev_prev == data_req_handle) begin
 							data_return <= size;
 							data_return_valid <= 1;
 							data_req_active <= 0;
@@ -97,7 +96,7 @@ module delay_master #(parameter data_width  = 16,
 					end
 					
 					`DATA_REQ_DELAY_BUF_DELAY: begin
-						if (buf_info_read_handle_prev_prev == data_req_ctrl_data_r[23:8]) begin
+						if (buf_info_read_handle_prev_prev == data_req_handle) begin
 							data_return <= delay;
 							data_return_valid <= 1;
 							data_req_active <= 0;
@@ -105,7 +104,7 @@ module delay_master #(parameter data_width  = 16,
 					end
 					
 					`DATA_REQ_DELAY_BUF_ADDR: begin
-						if (buf_info_read_handle_prev_prev == data_req_ctrl_data_r[23:8]) begin
+						if (buf_info_read_handle_prev_prev == data_req_handle) begin
 							data_return <= addr;
 							data_return_valid <= 1;
 							data_req_active <= 0;
@@ -113,7 +112,7 @@ module delay_master #(parameter data_width  = 16,
 					end
 					
 					`DATA_REQ_DELAY_BUF_POS: begin
-						if (buf_info_read_handle_prev_prev == data_req_ctrl_data_r[23:8]) begin
+						if (buf_info_read_handle_prev_prev == data_req_handle) begin
 							data_return <= position;
 							data_return_valid <= 1;
 							data_req_active <= 0;
@@ -121,7 +120,7 @@ module delay_master #(parameter data_width  = 16,
 					end
 					
 					`DATA_REQ_DELAY_BUF_GAIN: begin
-						if (buf_info_read_handle_prev_prev == data_req_ctrl_data_r[23:8]) begin
+						if (buf_info_read_handle_prev_prev == data_req_handle) begin
 							data_return <= gain;
 							data_return_valid <= 1;
 							data_req_active <= 0;
@@ -129,7 +128,7 @@ module delay_master #(parameter data_width  = 16,
 					end
 					
 					`DATA_REQ_DELAY_BUF_LRWA: begin
-						if (buf_info_read_handle_prev_prev == data_req_ctrl_data_r[23:8]) begin
+						if (buf_info_read_handle_prev_prev == data_req_handle) begin
 							data_return[15: 0] <= buf_last_read_addr[data_req_handle];
 							data_return[31:16] <= buf_last_write_addr[data_req_handle];
 							data_return_valid <= 1;
