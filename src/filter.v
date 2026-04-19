@@ -25,8 +25,20 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 
         input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
         
-        input wire [3:0] flags_in
+        input wire [3:0] flags_in,
+        
+        output wire stuck
 	);
+	
+	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
+	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
+	
+	always @(posedge clk) begin
+		if (reset || next_handle == 0 || run_state != run_state_prev)
+			stuck_ctr <= 0;
+		else if (enable && stuck_ctr < `CYCLES_PER_SAMPLE)
+			stuck_ctr <= stuck_ctr + 1;
+	end
 	
 	localparam handle_width = $clog2(n_filters);
 	localparam addr_width   = $clog2(mem_size);
@@ -161,10 +173,14 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	localparam SHIFT		= 3'd6;
 	localparam SEND			= 3'd7;
 	
+	reg [2:0] run_state_prev;
 	reg [2:0] run_state;
 	reg calc_cooldown;
 	reg coef_write_cooldown;
 	reg coef_commit_cooldown;
+	
+	always @(posedge clk)
+		run_state_prev <= run_state;
 	
 	reg first_sample;
 	reg invalid_state;

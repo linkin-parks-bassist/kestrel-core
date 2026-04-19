@@ -272,6 +272,8 @@ module dsp_pipeline #(
 	wire [data_width - 1 : 0] filter_coef_target = ctrl_data_in[39: 24];
 	wire [17 : 0] filter_coef_data = ctrl_data_in[17:0];
 	
+    wire stuck_filter;
+	
 	filter_master #(.data_width(data_width), .n_filters(128), .mem_size(1024)) filters (
 		.clk(clk),
 		.reset(reset | resetting),
@@ -299,7 +301,9 @@ module dsp_pipeline #(
 
         .ctrl_data_in(ctrl_data_in),
         
-        .flags_in(filter_flags)
+        .flags_in(filter_flags),
+        
+        .stuck(stuck_filter)
 	);
 	
 	wire signed [data_width - 1 : 0] svf_data_in;
@@ -454,8 +458,9 @@ module dsp_pipeline #(
 	
 	wire [31:0] stuck_flags;
 	
-	assign stuck_flags[31:17] = 0;
+	assign stuck_flags[31:18] = 0;
 	assign stuck_flags[16] = stuck_delay;
+	assign stuck_flags[17] = stuck_filter;
 	assign stuck_flags[15:0] = stuck_flags_core;
 	
 	always @(*) begin
