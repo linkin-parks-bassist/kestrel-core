@@ -61,6 +61,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	reg [data_width - 1 : 0] order_fb_r;
 
     reg [7:0] coef_write_handle_r;
+    reg [7:0] coef_commit_handle_r;
     reg [data_width - 1 : 0] coef_target_r;
     reg signed [math_width - 1 : 0] coef_data_r;
 
@@ -79,6 +80,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
             order_fb_r <= ctrl_data_in[data_width - 1 : 0];
 
             coef_write_handle_r <= ctrl_data_in[6 * 8 - 1 : 5 * 8];
+            coef_commit_handle_r <= ctrl_data_in[7 : 0];
             coef_target_r <= ctrl_data_in[24 + 2 * 8 - 1 : 24];
             coef_data_r <= ctrl_data_in[data_width - 1 + math_width - data_width : 0];
         end
@@ -433,7 +435,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 				wait_one <= 1;
 				busy <= 1;
 			end else if (~coef_commit_cooldown & coef_commit_r) begin
-				config_mem_read_addr <= coef_write_handle_r;
+				config_mem_read_addr <= coef_commit_handle_r;
 				coef_committing <= 1;
 				wait_one <= 1;
 				busy <= 1;

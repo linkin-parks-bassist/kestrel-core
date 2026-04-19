@@ -416,8 +416,7 @@ module control_unit
 							end
 							
 							`COMMAND_COMMIT_FILTER_COEF: begin
-								state <= FILTER_COMMIT_WAIT;
-								filter_coef_commit[front_pipeline] <= 1;
+								bytes_needed <= 1;
 							end
 							
 							`COMMAND_READOUT: begin
@@ -697,6 +696,11 @@ module control_unit
 								wait_one <= 1;
 								busy_flag <= 0;
 							end
+						end
+						
+						`COMMAND_COMMIT_FILTER_COEF: begin
+							state <= FILTER_COMMIT_WAIT;
+							filter_coef_commit[front_pipeline] <= 1;
 						end
 						
 						`COMMAND_READ: begin
