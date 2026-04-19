@@ -212,7 +212,7 @@ module dsp_pipeline #(
 
 	delay_master #(
 		.data_width(data_width), 
-		.n_buffers(4),
+		.n_buffers(128),
 		.addr_width(sdram_addr_width)
 	) delays (
 		.clk(clk),
@@ -272,7 +272,7 @@ module dsp_pipeline #(
 	wire [data_width - 1 : 0] filter_coef_target = ctrl_data_in[39: 24];
 	wire [17 : 0] filter_coef_data = ctrl_data_in[17:0];
 	
-	filter_master #(.data_width(data_width), .n_filters(32), .mem_size(1024)) filters (
+	filter_master #(.data_width(data_width), .n_filters(128), .mem_size(1024)) filters (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -321,7 +321,7 @@ module dsp_pipeline #(
 	
 	wire [4 : 0] svf_shift_in;
 	
-	svf_master #(.data_width(data_width), .math_width(18), .block_addr_width($clog2(n_blocks)), .n_slots(32)) svf
+	svf_master #(.data_width(data_width), .math_width(18), .block_addr_width($clog2(n_blocks)), .n_slots(128) svf
 	(
 		.clk(clk),
 		.reset(reset | resetting),
