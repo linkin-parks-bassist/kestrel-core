@@ -49,7 +49,7 @@ module instr_decoder #(parameter data_width = 16)
 	assign operation 		  = instr[4  :  0];
 	assign {src_a_reg, src_a} = instr[10 :  6];
 	assign {src_b_reg, src_b} = instr[15 : 11];
-	assign shift_disable  	  = instr[	 31];
+	assign shift_disable  	  = instr[	   31];
 	
 	assign {src_c_reg, src_c} = (instr_format) ? 		5'b0  : instr[20:16];
 	assign dest 			  = (instr_format) ? instr[19:16] : instr[24:21];
@@ -74,7 +74,8 @@ module instr_decoder #(parameter data_width = 16)
 						|| operation == `BLOCK_INSTR_DELAY_WRITE
 						|| operation == `BLOCK_INSTR_MEM_WRITE
 						|| operation == `BLOCK_INSTR_FILTER
-						|| operation == `BLOCK_INSTR_SVF);
+						|| operation == `BLOCK_INSTR_SVF
+						|| operation == `BLOCK_INSTR_POLY);
 	
 	assign arg_b_needed = (operation == `BLOCK_INSTR_MADD
 						|| operation == `BLOCK_INSTR_MIN
@@ -96,7 +97,7 @@ module instr_decoder #(parameter data_width = 16)
 	assign signedness = (operation != `BLOCK_INSTR_UMACZ && operation != `BLOCK_INSTR_UMAC);
 	
 	always_comb begin
-		if	  (operation == `BLOCK_INSTR_DELAY_READ || operation == `BLOCK_INSTR_DELAY_WRITE) branch = `INSTR_BRANCH_DELAY;
+		if	  (operation == `BLOCK_INSTR_DELAY_READ || operation == `BLOCK_INSTR_DELAY_WRITE)   branch = `INSTR_BRANCH_DELAY;
 		else if (operation == `BLOCK_INSTR_LUT_READ) 											branch = `INSTR_BRANCH_LUT;
 		else if (operation == `BLOCK_INSTR_MEM_WRITE  || operation == `BLOCK_INSTR_MEM_READ) 	branch = `INSTR_BRANCH_MEM;
 		else if (operation == `BLOCK_INSTR_MACZ 	  || operation == `BLOCK_INSTR_UMACZ
@@ -108,7 +109,8 @@ module instr_decoder #(parameter data_width = 16)
 			  || operation == `BLOCK_INSTR_MOV_UACC)		 									branch = `INSTR_BRANCH_MISC;
 		else if (operation == `BLOCK_INSTR_FILTER     || operation == `BLOCK_INSTR_FCASC
 			  || operation == `BLOCK_INSTR_SVF		  || operation == `BLOCK_INSTR_SVF_LOW
-			  || operation == `BLOCK_INSTR_SVF_HIGH	  || operation == `BLOCK_INSTR_SVF_BAND)	branch = `INSTR_BRANCH_FILT;
+			  || operation == `BLOCK_INSTR_SVF_HIGH	  || operation == `BLOCK_INSTR_SVF_BAND
+			  || operation == `BLOCK_INSTR_POLY)												branch = `INSTR_BRANCH_FILT;
 		else
 			branch = `INSTR_BRANCH_MADD;
 	end
@@ -126,10 +128,11 @@ module instr_decoder #(parameter data_width = 16)
 	always_comb begin
 		case (operation)
 			`BLOCK_INSTR_FCASC: 	flags = 4'b0001;
-			`BLOCK_INSTR_SVF: 		flags = 4'b0001;
-			`BLOCK_INSTR_SVF_LOW: 	flags = 4'b0010;
-			`BLOCK_INSTR_SVF_HIGH: 	flags = 4'b0011;
-			`BLOCK_INSTR_SVF_BAND: 	flags = 4'b0100;
+			`BLOCK_INSTR_SVF: 		flags = 4'b0010;
+			`BLOCK_INSTR_SVF_LOW: 	flags = 4'b0011;
+			`BLOCK_INSTR_SVF_HIGH: 	flags = 4'b0100;
+			`BLOCK_INSTR_SVF_BAND: 	flags = 4'b0101;
+			`BLOCK_INSTR_POLY: 		flags = 4'b1000;
 			
 			default:				flags = 4'b0000;
 		endcase

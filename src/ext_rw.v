@@ -295,8 +295,7 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 		input wire signed [data_width - 1 : 0] svf_high_in,
 		input wire signed [data_width - 1 : 0] svf_band_in,
 		
-		input wire read_valid,
-		input wire write_ack,
+		input wire data_valid,
 		
 		input wire svf_ack,
 		input wire svf_valid,
@@ -349,7 +348,6 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 		if (reset) begin
 			state <= IDLE;
 			commit_id_out <= 0;
-			write_latched <= 0;
 			
 			block_latched <= 0;
 			commit_id_latched <= 0;
@@ -375,21 +373,19 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 						req_id_out <= block_in;
 						flags_out <= flags_in;
 						
-						if (flags_in == 4'b0000) begin
+						if (flags_in[3:1] == 3'b000) begin
 							state <= FILTER_REQ;
-						end else if (flags_in == 4'b0001) begin
+						end else if (flags_in == 4'b0010) begin
 							state <= SVF_REQ;
 							svf_req <= 1;
-						end else if (flags_in == 4'b0010 || flags_in == 4'b0011 || flags_in == 4'b0100) begin
+						end else if (flags_in == 4'b0011 || flags_in == 4'b0100 || flags_in == 4'b0101) begin
 							state <= SVF_WAIT;
 						end
 					end
 				end
 				
 				FILTER_REQ: begin
-					if (write_latched && write_ack) begin
-						state <= IDLE;
-					end else if (!write_latched && read_valid) begin
+					if (data_valid) begin
 						result_out <= data_in;
 						
 						commit_id_out <= commit_id_latched;

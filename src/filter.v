@@ -143,6 +143,15 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	
 	reg signed [2 * math_width + 8 - 1 : 0] accumulator;
 	
+	localparam signed [2 * math_width + 8 - 1  : 0] sat_max = ( 1 << (data_width - 1)) - 1;
+	localparam signed [2 * math_width + 8 - 1  : 0] sat_min = (-1 << (data_width - 1));
+	
+	localparam signed [data_width - 1  : 0] sat_max_t = ( 1 << (data_width - 1)) - 1;
+	localparam signed [data_width - 1  : 0] sat_min_t = (-1 << (data_width - 1));
+	
+	wire signed [data_width - 1 : 0] acc_t = accumulator[data_width - 1 : 0];
+	wire signed [data_width - 1 : 0] resul_sat = (accumulator > sat_max) ? sat_max_t : ((accumulator < sat_min) ? sat_min_t : acc_t);
+	
 	localparam FETCH_CONFIG = 3'd0;
 	localparam STARTUP 		= 3'd1;
 	localparam FIRST_SAMPLE = 3'd2;
@@ -174,6 +183,13 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	reg skip_state_write;
 	
 	reg signed [data_width - 1 : 0] data_in_r;
+	
+	wire signed [2 * data_width - 1 : 0] next_pow_p = data_in_r * pow;
+	wire signed [data_width - 1 : 0] next_pow = next_pow_p >>> (data_width - 1);
+	
+	reg signed [data_width : 0] pow;
+	
+	wire poly_mode = flags_r[3];
 	
 	always @(posedge clk) begin
 		out_valid <= 0;
@@ -273,7 +289,9 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 					
 					FIRST_SAMPLE: begin
 						factor_a <= coef_mem_read_val;
-						factor_b <= data_in_r;
+						factor_b <= poly_mode ? pow : data_in_r;
+						
+						pow <= next_pow;
 						
 						coef_mem_read_addr <= coef_mem_read_addr + 1;
 						state_mem_read_addr <= state_mem_read_addr + 1;
@@ -288,14 +306,18 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 						coef_mem_read_addr  <= coef_mem_read_addr  + 1;
 						state_mem_read_addr <= state_mem_read_addr + 1;
 						
-						state_mem_write_addr <= state_mem_read_addr_prev;
-						state_mem_write_val  <= factor_b;
-						state_mem_write_enable <= 1;
+						if (!poly_mode) begin
+							state_mem_write_addr <= state_mem_read_addr_prev;
+							state_mem_write_val  <= factor_b;
+							state_mem_write_enable <= 1;
+						end
 						
 						counter <= counter + 1;
 						
 						factor_a <=  coef_mem_read_val;
-						factor_b <= invalid_state ? 0 : state_mem_read_val;
+						factor_b <= poly_mode ? pow : (invalid_state ? 0 : state_mem_read_val);
+						
+						pow <= next_pow;
 						
 						if (counter == current_order_ff - 1) begin
 							skip_state_write <= 1;
@@ -333,9 +355,11 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 						
 						shift <= 17 - format;
 						
-						state_mem_write_addr   <= state_mem_read_addr_prev;
-						state_mem_write_val    <= factor_b;
-						state_mem_write_enable <= ~skip_state_write;
+						if (!poly_mode) begin
+							state_mem_write_addr   <= state_mem_read_addr_prev;
+							state_mem_write_val    <= factor_b;
+							state_mem_write_enable <= ~skip_state_write;
+						end
 					end
 					
 					SHIFT: begin
@@ -352,7 +376,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 							accumulator <= accumulator >>> 1;
 							shift <= shift & 5'b11110;
 						end else begin
-							if (current_order_fb != 0) begin
+							if (current_order_fb != 0 && ~poly_mode) begin
 								state_mem_write_addr <= current_addr + current_order_ff - 1;
 								state_mem_write_val <= accumulator;
 								state_mem_write_enable <= 1;
@@ -365,7 +389,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 					SEND: begin
 						busy <= 0;
 						
-						data_out <= accumulator;
+						data_out <= resul_sat;
 						
 						out_valid <= 1;
 						calculating <= 0;
@@ -413,6 +437,10 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 					handle_r <= handle_in;
 					data_in_r <= flags_in[0] ? data_out : data_in;
 					flags_r <= flags_in;
+					
+					if (flags_in[3]) begin
+						pow <= (1 << data_width - 1);
+					end
 				end
 			end
 		end

@@ -936,9 +936,7 @@ module dsp_core #(
 		.req_id_out(svf_block_out),
 		
 		.data_in(filter_data_in),
-		.read_valid(filter_data_valid),
-		
-		.write_ack(1'b0),
+		.data_valid(filter_data_valid),
 		
 		.svf_req(svf_req),
 		.svf_ack(svf_ack),
