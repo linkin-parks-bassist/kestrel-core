@@ -321,7 +321,7 @@ module dsp_pipeline #(
 	
 	wire [4 : 0] svf_shift_in;
 	
-	svf_master #(.data_width(data_width), .math_width(18), .block_addr_width($clog2(n_blocks)), .n_slots(128) svf
+	svf_master #(.data_width(data_width), .math_width(18), .block_addr_width($clog2(n_blocks)), .n_slots(128)) svf
 	(
 		.clk(clk),
 		.reset(reset | resetting),
