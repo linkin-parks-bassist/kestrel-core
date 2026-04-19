@@ -76,7 +76,7 @@ module control_unit
 	wire [7:0] flags;
 	
 	assign flags[0] = initialised_flag;
-	assign flags[1] = busy_flag;
+	assign flags[1] = (state == LISTEN);
 	assign flags[2] = timeout_flag;
 	assign flags[3] = programming_flag;
 	assign flags[4] = bad_flag;
