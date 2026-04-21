@@ -96,13 +96,13 @@ module svf_master #(parameter data_width, parameter math_width, parameter block_
 	localparam signed [math_width - 1 : 0] sat_max = ( 1 << (data_width - 1)) - 1;
 	localparam signed [math_width - 1 : 0] sat_min = (-1 << (data_width - 1));
 	
-	wire signed [data_width - 1 : 0] low_sat  = low  > sat_max ? sat_min : ((low  < sat_min) ? sat_min : low);
-	wire signed [data_width - 1 : 0] high_sat = high > sat_max ? sat_min : ((high < sat_min) ? sat_min : high);
+	wire signed [data_width - 1 : 0] low_sat  = (low  > sat_max) ? sat_max : ((low  < sat_min) ? sat_min : low);
+	wire signed [data_width - 1 : 0] high_sat = (high > sat_max) ? sat_max : ((high < sat_min) ? sat_min : high);
 	
 	wire signed [2 * math_width - 1 : 0] band_normalised 	= d_in_r * band;
 	wire signed [math_width - 1 : 0] band_normalised_sh 	= band_normalised >> (data_width - 1 - shift_in_r);
 	reg  signed [math_width - 1 : 0] band_normalised_sh_r;
-	wire signed [data_width - 1 : 0] band_normalised_sh_sat	= (band_normalised_sh_r > sat_max) ? sat_min : ((band_normalised_sh_r < sat_min) ? sat_min : band_normalised_sh_r);
+	wire signed [data_width - 1 : 0] band_normalised_sh_sat	= (band_normalised_sh_r > sat_max) ? sat_max : ((band_normalised_sh_r < sat_min) ? sat_min : band_normalised_sh_r);
 	
 	always @(posedge clk) begin
 		if (reset) begin
@@ -211,8 +211,8 @@ module svf_master #(parameter data_width, parameter math_width, parameter block_
 				CALC_6: begin
 					band <= band_plus_product_r;
 					
-					high_out <= high;
-					low_out  <= low;
+					high_out <= high_sat;
+					low_out  <= low_sat;
 					
 					factor_a <= band_plus_product_r;
 					factor_b <= d_in_r;

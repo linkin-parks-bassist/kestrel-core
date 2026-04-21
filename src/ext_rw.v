@@ -1,4 +1,5 @@
 `include "instr_dec.vh"
+`include "defs.vh"
 `include "lut.vh"
 `include "core.vh"
 
@@ -282,9 +283,11 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 		input wire signed [data_width   - 1 : 0] arg_b_in,
 		input wire signed [data_width   - 1 : 0] arg_c_in,
 		
-		output wire read_req,
-		output wire write_req,
+		output wire filter_req,
 		output reg  svf_req,
+		
+		input wire [3:0] req_type_in,
+		output reg [3:0] req_type_out,
 		
 		output reg 		[handle_width - 1 : 0] handle_out,
 		output reg signed [data_width - 1 : 0] arg_a_out,
@@ -309,10 +312,7 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 		output reg signed [data_width - 1 : 0] result_out,
 		
 		input wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
-		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
-		
-		input wire [3:0] flags_in,
-		output reg [3:0] flags_out
+		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out
 	);
 	
 	localparam ch_addr_w = $clog2(n_channels);
@@ -327,8 +327,7 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 	assign in_ready  = (state == IDLE);
 	assign out_valid = (state == DONE);
 	
-	assign read_req  = (state == FILTER_REQ) & ~write_latched;
-	assign write_req = (state == FILTER_REQ) &  write_latched;
+	assign filter_req  = (state == FILTER_REQ);
 	
 	reg [$clog2(n_blocks) - 1 : 0] block_latched;
 	reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_latched;
@@ -336,7 +335,7 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 	reg write_latched;
 	reg [2:0] state;
 	
-	reg [3:0] flags_latched;
+	reg [3:0] req_type_latched;
 	
 	wire signed [acc_width - 1 : 0] svf_low  = {{(acc_width - data_width){svf_low_in[data_width-1]}}, svf_low_in};
 	wire signed [acc_width - 1 : 0] svf_high = {{(acc_width - data_width){svf_high_in[data_width-1]}}, svf_high_in};
@@ -371,16 +370,20 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 						commit_id_latched <= commit_id_in;
 						
 						req_id_out <= block_in;
-						flags_out <= flags_in;
+						req_type_out <= req_type_in;
 						
-						if (flags_in[3:1] == 3'b000) begin
-							state <= FILTER_REQ;
-						end else if (flags_in == 4'b0010) begin
-							state <= SVF_REQ;
-							svf_req <= 1;
-						end else if (flags_in == 4'b0011 || flags_in == 4'b0100 || flags_in == 4'b0101) begin
-							state <= SVF_WAIT;
-						end
+						case (req_type_in)
+							`FILTER_REQ_TYPE_FILTER: state <= FILTER_REQ;
+							`FILTER_REQ_TYPE_FCASC:  state <= FILTER_REQ;
+							`FILTER_REQ_TYPE_SVF:  begin
+								state <= SVF_REQ;
+								svf_req <= 1;
+							end
+							
+							`FILTER_REQ_TYPE_SVF_LOW:  state <= SVF_WAIT;
+							`FILTER_REQ_TYPE_SVF_BAND: state <= SVF_WAIT;
+							`FILTER_REQ_TYPE_SVF_HIGH: state <= SVF_WAIT;
+						endcase
 					end
 				end
 				
@@ -403,10 +406,10 @@ module resource_branch_filter #(parameter data_width = 16, parameter handle_widt
 				
 				SVF_WAIT: begin
 					if (svf_valid) begin
-						case (flags_out)
-							4'b0010: result_out <= svf_low;
-							4'b0011: result_out <= svf_high;
-							4'b0100: result_out <= svf_band;
+						case (req_type_out)
+							`FILTER_REQ_TYPE_SVF_LOW:  result_out <= svf_low;
+							`FILTER_REQ_TYPE_SVF_HIGH: result_out <= svf_high;
+							`FILTER_REQ_TYPE_SVF_BAND: result_out <= svf_band;
 						endcase
 						
 						commit_id_out <= commit_id_latched;

@@ -127,12 +127,13 @@ module instr_decoder #(parameter data_width = 16)
 	
 	always_comb begin
 		case (operation)
-			`BLOCK_INSTR_FCASC: 	flags = 4'b0001;
-			`BLOCK_INSTR_SVF: 		flags = 4'b0010;
-			`BLOCK_INSTR_SVF_LOW: 	flags = 4'b0011;
-			`BLOCK_INSTR_SVF_HIGH: 	flags = 4'b0100;
-			`BLOCK_INSTR_SVF_BAND: 	flags = 4'b0101;
-			`BLOCK_INSTR_POLY: 		flags = 4'b1000;
+			`BLOCK_INSTR_FILTER:	flags = `FILTER_REQ_TYPE_FILTER;
+			`BLOCK_INSTR_FCASC: 	flags = `FILTER_REQ_TYPE_FCASC;
+			`BLOCK_INSTR_SVF: 		flags = `FILTER_REQ_TYPE_SVF;
+			`BLOCK_INSTR_SVF_LOW: 	flags = `FILTER_REQ_TYPE_SVF_LOW;
+			`BLOCK_INSTR_SVF_HIGH: 	flags = `FILTER_REQ_TYPE_SVF_HIGH;
+			`BLOCK_INSTR_SVF_BAND: 	flags = `FILTER_REQ_TYPE_SVF_BAND;
+			`BLOCK_INSTR_POLY: 		flags = `FILTER_REQ_TYPE_POLY;
 			
 			default:				flags = 4'b0000;
 		endcase

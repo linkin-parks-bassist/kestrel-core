@@ -124,7 +124,7 @@ module dsp_pipeline #(
 		.filter_data_out(filter_data_out),
 		.filter_data_in(filter_data_in),
 		.filter_data_valid(filter_data_valid),
-		.filter_flags(filter_flags),
+		.filter_req_type(filter_req_type),
 		
 		.reg_writes_commit(reg_writes_commit),
 		.regfile_syncing(regfile_syncing),
@@ -201,18 +201,9 @@ module dsp_pipeline #(
     
     wire stuck_delay;
 
-	/*	
-	`COMMAND_ALLOC_DELAY: begin
-		delay_size_out <= {8'd0, byte_5_in, byte_4_in, byte_3_in};
-		init_delay_out <= {8'd0, byte_2_in, byte_1_in, byte_0_in};
-		alloc_delay[back_pipeline] <= 1;
-		state <= READY;
-	end
-	*/
-
 	delay_master #(
 		.data_width(data_width), 
-		.n_buffers(128),
+		.n_buffers(32),
 		.addr_width(sdram_addr_width)
 	) delays (
 		.clk(clk),
@@ -258,7 +249,7 @@ module dsp_pipeline #(
 	);
 	
 	wire filter_calc_req;
-	wire [3:0] filter_flags;
+	wire [3:0] filter_req_type;
 	wire [7:0] filter_handle_out;
 	wire signed [data_width - 1 : 0] filter_data_out;
 	wire signed [data_width - 1 : 0] filter_data_in;
@@ -270,7 +261,7 @@ module dsp_pipeline #(
 	
     wire stuck_filter;
 	
-	filter_master #(.data_width(data_width), .n_filters(128), .mem_size(1024)) filters (
+	filter_master #(.data_width(data_width), .n_filters(32), .mem_size(1024)) filters (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -287,6 +278,8 @@ module dsp_pipeline #(
 		.coef_ack(filter_ack),
 		
 		.calc_req(filter_calc_req),
+        .req_type_in(filter_req_type),
+        
 		.handle_in(filter_handle_out),
 		.data_in(filter_data_out),
 		.data_out(filter_data_in),
@@ -294,7 +287,6 @@ module dsp_pipeline #(
 
         .ctrl_data_in(ctrl_data_in),
         
-        .flags_in(filter_flags),
         
         .stuck(stuck_filter)
 	);
@@ -318,7 +310,7 @@ module dsp_pipeline #(
 	
 	wire [4 : 0] svf_shift_in;
 	
-	svf_master #(.data_width(data_width), .math_width(18), .block_addr_width($clog2(n_blocks)), .n_slots(128)) svf
+	svf_master #(.data_width(data_width), .math_width(18), .block_addr_width($clog2(n_blocks)), .n_slots(32)) svf
 	(
 		.clk(clk),
 		.reset(reset | resetting),

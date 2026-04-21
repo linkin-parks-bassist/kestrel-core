@@ -1,3 +1,5 @@
+`include "defs.vh"
+
 module filter_master #(parameter data_width = 16, parameter math_width = 18, parameter n_filters = 128, parameter mem_size = 2048)
 	(
 		input wire clk,
@@ -15,6 +17,8 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 		output reg coef_ack,
 		
 		input wire calc_req,
+        input wire [3:0] req_type_in,
+        
 		input wire [7:0] handle_in,
 		input wire signed [data_width - 1 : 0] data_in,
 		output reg signed [data_width - 1 : 0] data_out,
@@ -22,7 +26,6 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 
         input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
         
-        input wire [3:0] flags_in,
         
         output wire stuck
 	);
@@ -47,7 +50,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 		 + 5			 // format
 		 + 1;			 // coef bank
 	
-	reg [3:0] flags_r;
+	reg [3:0] req_type_r;
 
     reg alloc_req_r;
     reg coef_write_r;
@@ -204,7 +207,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	
 	reg signed [data_width : 0] pow;
 	
-	wire poly_mode = flags_r[3];
+	wire poly_mode = (req_type_r == `FILTER_REQ_TYPE_POLY);
 	
 	always @(posedge clk) begin
 		out_valid <= 0;
@@ -263,7 +266,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 			format <= 0;
 			shift <= 0;
 			
-			flags_r <= 0;
+			req_type_r <= 0;
 		end else if (busy) begin
 			if (coef_writing) begin
 				if (!wait_one) begin
@@ -450,10 +453,10 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 					wait_one <= 1;
 					invalid_state <= state_invalid[handle_in];
 					handle_r <= handle_in;
-					data_in_r <= flags_in[0] ? data_out : data_in;
-					flags_r <= flags_in;
+					data_in_r <= req_type_in[0] ? data_out : data_in;
+					req_type_r <= req_type_in;
 					
-					if (flags_in[3]) begin
+					if (req_type_in == `FILTER_REQ_TYPE_POLY) begin
 						pow <= (1 << data_width - 1);
 					end
 				end

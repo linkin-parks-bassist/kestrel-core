@@ -62,7 +62,7 @@ module dsp_core #(
 		output wire signed [data_width - 1 : 0] filter_data_out,
 		input  wire signed [data_width - 1 : 0] filter_data_in,
 		input  wire filter_data_valid,
-		output wire [3:0] filter_flags,
+		output wire [3:0] filter_req_type,
 		
 		input wire reg_writes_commit,
 		output wire regfile_syncing,
@@ -930,8 +930,10 @@ module dsp_core #(
 		
 		.handle_out(filter_handle_out),
 		
-		.read_req(filter_calc_req),
-		.write_req(),
+		.filter_req(filter_calc_req),
+		
+		.req_type_in(flags_out_router),
+		.req_type_out(filter_req_type),
 		
 		.req_id_out(svf_block_out),
 		
@@ -946,10 +948,8 @@ module dsp_core #(
 		.result_out(result_final_stages[`INSTR_BRANCH_FILT]),
 		
 		.commit_id_in(commit_id_out_router),
-		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_FILT]),
+		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_FILT])
 		
-		.flags_in(flags_out_router),
-		.flags_out(filter_flags)
 	);
 	
 	/*****************/
