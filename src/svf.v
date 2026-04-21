@@ -101,7 +101,8 @@ module svf_master #(parameter data_width, parameter math_width, parameter block_
 	
 	wire signed [2 * math_width - 1 : 0] band_normalised 	= d_in_r * band;
 	wire signed [math_width - 1 : 0] band_normalised_sh 	= band_normalised >> (data_width - 1 - shift_in_r);
-	wire signed [data_width - 1 : 0] band_normalised_sh_sat	= band_normalised_sh > sat_max ? sat_min : ((band_normalised_sh < sat_min) ? sat_min : band_normalised_sh);
+	reg  signed [math_width - 1 : 0] band_normalised_sh_r;
+	wire signed [data_width - 1 : 0] band_normalised_sh_sat	= (band_normalised_sh_r > sat_max) ? sat_min : ((band_normalised_sh_r < sat_min) ? sat_min : band_normalised_sh_r);
 	
 	always @(posedge clk) begin
 		if (reset) begin
@@ -224,16 +225,17 @@ module svf_master #(parameter data_width, parameter math_width, parameter block_
 				end
 				
 				CALC_7: begin
+					band_normalised_sh_r <= band_normalised_sh;
+					
+					state <= CALC_8;
+				end
+				
+				CALC_8: begin
 					band_out <= band_normalised_sh_sat;
 					
 					data_valid <= 1;
 					prev_slot <= current_slot;
-					
 					state <= IDLE;
-				end
-				
-				CALC_8: begin
-					
 				end
 			endcase
 		end

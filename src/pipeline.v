@@ -263,10 +263,6 @@ module dsp_pipeline #(
 	wire signed [data_width - 1 : 0] filter_data_out;
 	wire signed [data_width - 1 : 0] filter_data_in;
 	wire filter_data_valid;
-	
-	wire [data_width - 1 : 0] filter_order_ff = ctrl_data_in[31 : 16];
-	wire [data_width - 1 : 0] filter_order_fb = ctrl_data_in[15 : 0];
-	wire [7:0] filter_alloc_format = ctrl_data_in[39:32];
 
 	wire [data_width - 1 : 0] filter_coef_write_handle = ctrl_data_in[47:40];
 	wire [data_width - 1 : 0] filter_coef_target = ctrl_data_in[39: 24];
@@ -281,9 +277,6 @@ module dsp_pipeline #(
 		.enable(pr_enable),
 		
 		.alloc_req(alloc_filter),
-		.order_ff(filter_order_ff),
-		.order_fb(filter_order_fb),
-		.alloc_format(filter_alloc_format),
 		
 		.coef_write(filter_coef_write),
 		.coef_commit(filter_coef_commit),

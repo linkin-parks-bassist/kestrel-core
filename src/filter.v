@@ -5,9 +5,6 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 		input wire enable,
 		
 		input wire alloc_req,
-		input wire [data_width - 1 : 0] order_ff,
-		input wire [data_width - 1 : 0] order_fb,
-		input wire [7 : 0] alloc_format,
 		
 		input wire coef_write,
 		input wire coef_commit,
@@ -139,7 +136,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	reg busy;
 	
 	wire filter_capacity = (next_handle < n_filters);
-	wire mem_capacity = (next_addr + order_ff + order_fb < mem_size);
+	wire mem_capacity = (next_addr + order_ff_r + order_fb_r < mem_size);
 	
 	reg [addr_width - 1 : 0] coef_target_addr;
 	reg signed [math_width - 1 : 0] coef_to_write;
@@ -207,7 +204,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	
 	reg signed [data_width : 0] pow;
 	
-	wire poly_mode = flags_r[3];
+	wire poly_mode = 0;
 	
 	always @(posedge clk) begin
 		out_valid <= 0;
@@ -456,9 +453,9 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 					data_in_r <= flags_in[0] ? data_out : data_in;
 					flags_r <= flags_in;
 					
-					if (flags_in[3]) begin
-						pow <= (1 << data_width - 1);
-					end
+					//if (flags_in[3]) begin
+					//	pow <= (1 << data_width - 1);
+					//end
 				end
 			end
 		end
