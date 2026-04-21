@@ -204,7 +204,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	
 	reg signed [data_width : 0] pow;
 	
-	wire poly_mode = 0;
+	wire poly_mode = flags_r[3];
 	
 	always @(posedge clk) begin
 		out_valid <= 0;
@@ -453,9 +453,9 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 					data_in_r <= flags_in[0] ? data_out : data_in;
 					flags_r <= flags_in;
 					
-					//if (flags_in[3]) begin
-					//	pow <= (1 << data_width - 1);
-					//end
+					if (flags_in[3]) begin
+						pow <= (1 << data_width - 1);
+					end
 				end
 			end
 		end
