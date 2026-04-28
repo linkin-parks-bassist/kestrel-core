@@ -48,7 +48,7 @@ module gain_controller #(parameter data_width = 16, parameter gain_shift = 4)
 	localparam signed [data_width - 1 : 0] unity_gain 				= 1 << (data_width - 1 - gain_shift);
 	localparam signed [data_width - 1 : 0] switch_velocity 			= unity_gain >> 8;
 	localparam signed [data_width - 1 : 0] tail_close_velocity 		= unity_gain >> 9;
-	localparam signed [data_width - 1 : 0] tail_envelope_threshold 	= 1 << 5;
+	localparam signed [data_width - 1 : 0] tail_envelope_threshold 	= 1 << 4;
 	
 	localparam [2:0] TAIL_SWAP_RAMP  = 3'd0;
 	localparam [2:0] TAIL_SWAP_DECAY = 3'd1;
@@ -96,7 +96,7 @@ module gain_controller #(parameter data_width = 16, parameter gain_shift = 4)
 								output_gains[~current_pipeline_r] <= unity_gain;
 							end else begin
 								input_gains [ current_pipeline_r] <=  input_gains[ current_pipeline_r] - switch_velocity;
-								output_gains[ current_pipeline_r] <= output_gains[ current_pipeline_r] - (switch_velocity >> 1);
+								output_gains[ current_pipeline_r] <= output_gains[ current_pipeline_r] - (switch_velocity >> 2);
 								output_gains[~current_pipeline_r] <= output_gains[~current_pipeline_r] + switch_velocity;
 							end
 						end
@@ -107,7 +107,7 @@ module gain_controller #(parameter data_width = 16, parameter gain_shift = 4)
 							if (output_gains[current_pipeline_r] == 0) begin
 								swap_tail_enable_state <= TAIL_SWAP_CLOSE;
 							end else begin
-								if (swap_tail_enable_ctr[4:0] == 5'b0)
+								if (swap_tail_enable_ctr[6:0] == 7'b0)
 									output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - 1;
 								
 								if (envelopes[current_pipeline_r] < tail_envelope_threshold) begin
