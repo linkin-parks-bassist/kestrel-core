@@ -97,6 +97,7 @@ module svf_master #(parameter data_width, parameter math_width, parameter block_
 	localparam signed [math_width - 1 : 0] sat_min = (-1 << (data_width - 1));
 	
 	wire signed [data_width - 1 : 0] low_sat  = (low  > sat_max) ? sat_max : ((low  < sat_min) ? sat_min : low);
+	wire signed [data_width - 1 : 0] band_sat = (band > sat_max) ? sat_max : ((band < sat_min) ? sat_min : band);
 	wire signed [data_width - 1 : 0] high_sat = (high > sat_max) ? sat_max : ((high < sat_min) ? sat_min : high);
 	
 	wire signed [2 * math_width - 1 : 0] band_normalised 	= d_in_r * band;
@@ -225,13 +226,7 @@ module svf_master #(parameter data_width, parameter math_width, parameter block_
 				end
 				
 				CALC_7: begin
-					band_normalised_sh_r <= band_normalised_sh;
-					
-					state <= CALC_8;
-				end
-				
-				CALC_8: begin
-					band_out <= band_normalised_sh_sat;
+					band_out <= band_sat;
 					
 					data_valid <= 1;
 					prev_slot <= current_slot;

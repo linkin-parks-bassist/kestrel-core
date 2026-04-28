@@ -48,6 +48,7 @@ module control_unit
 		input wire [1:0] filter_ack,
 		
 		output reg swap_pipelines,
+		output wire swap_tail_enable,
 		input wire pipelines_swapping,
 		output reg current_pipeline,
 		
@@ -83,6 +84,8 @@ module control_unit
 	assign flags[5] = data_ready_flag;
 	assign flags[6] = cmd_err_flag;
 	assign flags[7] = swapping;
+	
+	assign swap_tail_enable = tail_now;
 	
 	reg initialised_flag;
 	reg swapping;
@@ -189,6 +192,9 @@ module control_unit
     
     reg warmup;
     reg [31:0] warmup_ctr;
+    
+    reg tail_next;
+    reg tail_now;
 
 	always @(posedge clk) begin
 		reg_writes_commit <= 0;
@@ -264,6 +270,9 @@ module control_unit
 			timeout_flag 		<= 0;
 			bad_flag 			<= 0;
 			cmd_err_flag		<= 0;
+			
+			tail_now <= 0;
+			tail_next <= 0;
 		end else if (timeout) begin
 			pipeline_full_reset[back_pipeline] <= 1;
 			programming 	<= 0;
@@ -345,7 +354,6 @@ module control_unit
 								
 								if (!programming) ignore_command <= 1;
 							end
-							
 							
 							`COMMAND_WRITE_BLOCK_REG_1: begin
 								reg_target <= 1;
@@ -457,6 +465,11 @@ module control_unit
 							
 							`COMMAND_CLEAR_CMD_ERR_FLAG: begin
 								cmd_err_flag <= 0;
+								state <= READY;
+							end
+							
+							`COMMAND_ENABLE_TAIL: begin
+								tail_next <= 1;
 								state <= READY;
 							end
 							
@@ -738,8 +751,6 @@ module control_unit
 						if (health) begin
 							swap_pipelines <= 1;
 							
-							swap_pipelines <= 1;
-							
 							state <= SWAP_WAIT;
 							
 							wait_one <= 1;
@@ -766,8 +777,12 @@ module control_unit
 						pipeline_full_reset[front_pipeline] <= 1;
 						pipeline_enables   [front_pipeline] <= 0;
 						
+						tail_next <= 0;
+						tail_now <= tail_next;
+						
 						wait_one <= 1;
 						state <= RESET_WAIT;
+						
 					end
 				end
 				

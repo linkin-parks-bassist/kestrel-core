@@ -62,7 +62,7 @@ module dsp_engine #(
 		.clk(clk),
 		.reset(reset | pipeline_a_reset),
 		
-		.in_sample(in_sample_amped),
+		.in_sample(in_samples[0]),
 		.in_valid(pipeline_tick),
 		.out_sample(out_samples[0]),
 		
@@ -115,7 +115,7 @@ module dsp_engine #(
 		.clk(clk),
 		.reset(reset | pipeline_b_reset),
 		
-		.in_sample(in_sample_amped),
+		.in_sample(in_samples[1]),
 		.in_valid(pipeline_tick),
 		.out_sample(out_samples[1]),
 		
@@ -172,7 +172,9 @@ module dsp_engine #(
 		.reset(reset),
 		
 		.in_sample(in_sample_latched),
-		.in_sample_out(in_sample_amped),
+		
+		.in_sample_out_a(in_samples[0]),
+		.in_sample_out_b(in_samples[1]),
 		
 		.out_sample_in_a(out_samples_a),
 		.out_sample_in_b(out_samples_b),
@@ -191,6 +193,7 @@ module dsp_engine #(
 		.set_output_gain(set_output_gain),
 		
 		.swap_pipelines(swap_pipelines),
+		.swap_tail_enable(swap_tail_enable),
 		.pipelines_swapping(pipelines_swapping),
 		.current_pipeline(current_pipeline)
 	);
@@ -321,6 +324,7 @@ module dsp_engine #(
 		.filter_coef_data_out(filter_coef_data),
 		
 		.swap_pipelines(swap_pipelines),
+		.swap_tail_enable(swap_tail_enable),
 		.pipelines_swapping(pipelines_swapping),
 		.pipeline_regfiles_syncing(pipeline_regfiles_syncing),
 		.pipeline_reset(pipeline_reset),
@@ -449,7 +453,7 @@ module dsp_engine #(
 	/**********/
 	
 	reg  signed [data_width - 1 : 0]  in_sample_latched;
-	wire signed [data_width - 1 : 0]  in_sample_amped;
+	wire signed [data_width - 1 : 0]  in_samples [1:0];
 	wire signed [data_width - 1 : 0] out_samples [1:0];
 	wire signed [data_width - 1 : 0] out_sample_mixed;
 
@@ -483,6 +487,7 @@ module dsp_engine #(
 	wire [`BLOCK_INSTR_WIDTH - 1 : 0] ctrl_instr_out;
 
 	wire swap_pipelines;
+	wire swap_tail_enable;
 	wire controller_ready;
 
 	reg  ctrl_inp_ready = 0;
