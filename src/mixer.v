@@ -96,7 +96,6 @@ module gain_controller #(parameter data_width = 16, parameter gain_shift = 4)
 								output_gains[~current_pipeline_r] <= unity_gain;
 							end else begin
 								input_gains [ current_pipeline_r] <=  input_gains[ current_pipeline_r] - switch_velocity;
-								output_gains[ current_pipeline_r] <= output_gains[ current_pipeline_r] - (switch_velocity >> 2);
 								output_gains[~current_pipeline_r] <= output_gains[~current_pipeline_r] + switch_velocity;
 							end
 						end
@@ -107,7 +106,7 @@ module gain_controller #(parameter data_width = 16, parameter gain_shift = 4)
 							if (output_gains[current_pipeline_r] == 0) begin
 								swap_tail_enable_state <= TAIL_SWAP_CLOSE;
 							end else begin
-								if (swap_tail_enable_ctr[6:0] == 7'b0)
+								if (swap_tail_enable_ctr[5:0] == 6'b0)
 									output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - 1;
 								
 								if (envelopes[current_pipeline_r] < tail_envelope_threshold) begin
