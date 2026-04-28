@@ -58,7 +58,11 @@ module gain_controller #(parameter data_width = 16, parameter gain_shift = 4)
 	reg [ 2:0] swap_tail_enable_state;
 	reg [63:0] swap_tail_enable_ctr;
 	
+	reg current_pipeline_r;
+	
 	always @(posedge clk) begin
+	
+		current_pipeline_r <= current_pipeline;
 	
 		if (set_input_gain)   input_gain <= data_in;
 		if (set_output_gain) output_gain <= data_in;
@@ -87,49 +91,49 @@ module gain_controller #(parameter data_width = 16, parameter gain_shift = 4)
 				if (swap_tail_enable_r) begin
 					case (swap_tail_enable_state)
 						TAIL_SWAP_RAMP: begin
-							if (input_gains[current_pipeline] == 0) begin
+							if (input_gains[current_pipeline_r] == 0) begin
 								swap_tail_enable_state <= TAIL_SWAP_DECAY;
-								output_gains[~current_pipeline] <= unity_gain;
+								output_gains[~current_pipeline_r] <= unity_gain;
 							end else begin
-								input_gains [ current_pipeline] <=  input_gains[ current_pipeline] - switch_velocity;
-								output_gains[ current_pipeline] <= output_gains[ current_pipeline] - (switch_velocity >> 1);
-								output_gains[~current_pipeline] <= output_gains[~current_pipeline] + switch_velocity;
+								input_gains [ current_pipeline_r] <=  input_gains[ current_pipeline_r] - switch_velocity;
+								output_gains[ current_pipeline_r] <= output_gains[ current_pipeline_r] - (switch_velocity >> 1);
+								output_gains[~current_pipeline_r] <= output_gains[~current_pipeline_r] + switch_velocity;
 							end
 						end
 						
 						TAIL_SWAP_DECAY: begin
 							swap_tail_enable_ctr <= swap_tail_enable_ctr + 1;
 							
-							if (output_gains[current_pipeline] == 0) begin
+							if (output_gains[current_pipeline_r] == 0) begin
 								swap_tail_enable_state <= TAIL_SWAP_CLOSE;
 							end else begin
 								if (swap_tail_enable_ctr[4:0] == 5'b0)
-									output_gains[current_pipeline] <= output_gains[current_pipeline] - 1;
+									output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - 1;
 								
-								if (envelopes[current_pipeline] < tail_envelope_threshold) begin
+								if (envelopes[current_pipeline_r] < tail_envelope_threshold) begin
 									swap_tail_enable_state <= TAIL_SWAP_CLOSE;
 								end
 							end
 						end
 						
 						TAIL_SWAP_CLOSE: begin
-							output_gains[current_pipeline] <= output_gains[current_pipeline] - tail_close_velocity;
+							output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - tail_close_velocity;
 							
-							if ($signed(output_gains[current_pipeline] - tail_close_velocity) <= 0) begin
-								input_gains [current_pipeline] <= unity_gain;
-								output_gains[current_pipeline] <= 0;
+							if ($signed(output_gains[current_pipeline_r] - tail_close_velocity) <= 0) begin
+								input_gains [current_pipeline_r] <= unity_gain;
+								output_gains[current_pipeline_r] <= 0;
 								pipelines_swapping <= 0;
 							end
 						end
 					endcase
 				end else begin
-					if (output_gains[current_pipeline] == 0) begin
-						output_gains[~current_pipeline] <= unity_gain;
+					if (output_gains[current_pipeline_r] == 0) begin
+						output_gains[~current_pipeline_r] <= unity_gain;
 						pipelines_swapping <= 0;
 					end
 					else begin
-						output_gains[ current_pipeline] <= output_gains[ current_pipeline] - switch_velocity;
-						output_gains[~current_pipeline] <= output_gains[~current_pipeline] + switch_velocity;
+						output_gains[ current_pipeline_r] <= output_gains[ current_pipeline_r] - switch_velocity;
+						output_gains[~current_pipeline_r] <= output_gains[~current_pipeline_r] + switch_velocity;
 					end
 				end
 			end
