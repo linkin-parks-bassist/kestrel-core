@@ -546,6 +546,10 @@ module control_unit
 									bytes_needed <= 1 + 1;
 								end
 								
+								`DATA_REQ_MEM: begin
+									bytes_needed <= 1 + 2;
+								end
+								
 								`COMMAND_READ_COMMAND_LOG: begin
 									returned_data <= command_log;
 									push_command_log <= 0;

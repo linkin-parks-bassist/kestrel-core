@@ -217,11 +217,13 @@ module dsp_core #(
 	
 	reg  [`CTRL_DATA_BUS_WIDTH - 1 : 0] data_req_ctrl_data_r;
 	wire [7:0] data_req_type = data_req_ctrl_data_r[7:0];
-	wire [block_addr_w - 1 : 0] block_data_req_addr;
+	wire [block_addr_w 	- 1 : 0] block_data_req_addr;
+	wire [mem_addr_w 	- 1 : 0] mem_data_req_addr;
 	wire [7 : 0] block_data_req_reg;
 	
-	assign block_data_req_addr = data_req_ctrl_data_r[23:8];
-	assign block_data_req_reg = data_req_ctrl_data_r[31:24];
+	assign mem_data_req_addr 	= data_req_ctrl_data_r[8 +: mem_addr_w];
+	assign block_data_req_addr 	= data_req_ctrl_data_r[23:8];
+	assign block_data_req_reg 	= data_req_ctrl_data_r[31:24];
 	
 	always @(posedge clk) begin
 		data_return_valid <= 0;
@@ -266,6 +268,14 @@ module dsp_core #(
 						data_return <= stuck_flags;
 						data_return_valid <= 1;
 						data_req_active <= 0;
+					end
+					
+					`DATA_REQ_MEM: begin
+						if (mem_write_enable && mem_write_addr == block_data_req_addr) begin
+							data_return <= mem_write_val;
+							data_return_valid <= 1;
+							data_req_active <= 0;
+						end
 					end
 					
 					default: begin

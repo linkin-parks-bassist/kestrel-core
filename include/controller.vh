@@ -32,7 +32,6 @@
 
 `define CTRL_DATA_BUS_WIDTH (6 * 8)
 
-`define DATA_REQ_N_BLOCKS 		8'd14
 `define DATA_REQ_BLOCK_INSTR 	8'd1
 `define DATA_REQ_BLOCK_REG	 	8'd2
 
@@ -47,3 +46,5 @@
 `define DATA_REQ_SDRAM_READ_CNT	 8'd11
 `define DATA_REQ_SDRAM_WRITE_CNT 8'd12
 `define DATA_REQ_STUCK_FLAGS	 8'd13
+`define DATA_REQ_N_BLOCKS 		 8'd14
+`define DATA_REQ_MEM			 8'd15
