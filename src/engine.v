@@ -167,7 +167,7 @@ module dsp_engine #(
 	/* Mixer; applies input/output gain, crossfades pipelines */
 	/**********************************************************/
 	
-	mixer #(.data_width(data_width), .gain_shift(5)) mixerr (
+	mixer #(.data_width(data_width), .shift(5)) mixerr (
 		.clk(clk),
 		.reset(reset),
 		

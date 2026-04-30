@@ -91,8 +91,8 @@ module health_monitor #(parameter data_width = 16)
 	reg [7:0] peak_ctr;
 	reg [7:0] envelope_threshold_ctr;
 	
-	localparam envelope_threshold = (1 << (data_width - 2));
-	localparam envelope_threshold_ctr_threshold = 32;
+	localparam envelope_threshold = (1 << (data_width - 1)) * 0.75;
+	localparam envelope_threshold_ctr_threshold = 64;
 	localparam peak_ctr_threshold = 10;
 	
 	assign peak_detect = (peak_ctr > peak_ctr_threshold);
