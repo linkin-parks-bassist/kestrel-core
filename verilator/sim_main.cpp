@@ -204,27 +204,19 @@ int schedule_qnf(float x, int format, int when)
 {
 	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
 	
-	printf("x = %f\n", x);
-	
 	float sat_max =  pow(2.0, format) - pow(2.0, -15.0 + (float)format);
 	float sat_min = -pow(2.0, format);
 	
-	printf("sat_max = %f, sat_min = %f\n", sat_max, sat_min);
-	
 	if (x > sat_max)
 	{
-		printf("too big.\n");
 		x = sat_max;
 	}
 	if (x < sat_min)
 	{
-		printf("too small.\n");
 		x = sat_min;
 	}
 	
 	int16_t s = (int16_t)(x * pow(2.0, 15.0 - (float)format));
-	
-	printf("x = %f, s = %d\n", x, s);
 	
 	kest_fpga_batch_append_16(&batch, s);
 	
@@ -284,6 +276,8 @@ int main(int argc, char** argv)
 	std::vector<int16_t> in_samples;
 	WavHeader header;
 	
+	kest_mem_init();
+	
 	int use_wavs = 1;
 	
     const char* in_path  = NULL;
@@ -339,7 +333,7 @@ int main(int argc, char** argv)
 		schedule_qnf(g, 5, 15+i);
 	}
 	
-	kest_effect_desc *test_desc = kest_read_eff_desc_from_file("eff/DEL.EFF");
+	kest_effect_desc *test_desc = kest_read_eff_desc_from_file("eff/DMA.EFF");
 	
 	if (!test_desc)
 	{
@@ -347,11 +341,22 @@ int main(int argc, char** argv)
 		abort();
 	}
 	
+	
+	kest_effect_desc *test_desc2 = kest_read_eff_desc_from_file("eff/GAIN.EFF");
+	
+	if (!test_desc2)
+	{
+		printf("Failed.\n");
+		abort();
+	}
+	
 	kest_effect test_effect;
 	kest_effect test_effect2;
+	kest_effect test_effect3;
 	
 	if (test_desc)   init_effect_from_effect_desc(&test_effect,  test_desc);
-	if (test_desc)   init_effect_from_effect_desc(&test_effect2, test_desc);
+	if (test_desc2)  init_effect_from_effect_desc(&test_effect2, test_desc2);
+	//if (test_desc2)   init_effect_from_effect_desc(&test_effect3, test_desc2);
 	
 	
 	kest_eff_resource_report res = empty_m_eff_resource_report();
@@ -362,39 +367,32 @@ int main(int argc, char** argv)
 	
 	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
 	kest_fpga_batch_append_effect(&batch, &test_effect, &res, &pos);
+	//kest_fpga_batch_append(&batch, COMMAND_ENABLE_TAIL);
 	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
 	
-	append_send_queue(batch, 128);
-
-	pos = 0;
-	res = empty_m_eff_resource_report();
+	append_send_queue(batch, 16);
+	/*
+	
 	batch = kest_new_fpga_transfer_batch();
 	
 	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
-	kest_fpga_batch_append_effect(&batch, &test_effect2, &res, &pos);
+	kest_fpga_batch_append(&batch, &test_effect2, &res, &pos);
 	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
 	
-	append_send_queue(batch, 800);
-
-	pos = 0;
-	res = empty_m_eff_resource_report();
-	batch = kest_new_fpga_transfer_batch();
+	append_send_queue(batch, 512);
+	*/
 	
-	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
-	kest_fpga_batch_append_effect(&batch, &test_effect2, &res, &pos);
-	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
-	
-	append_send_queue(batch, 1768);
-
-	pos = 0;
-	res = empty_m_eff_resource_report();
-	batch = kest_new_fpga_transfer_batch();
-	
-	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
-	kest_fpga_batch_append_effect(&batch, &test_effect2, &res, &pos);
-	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
-	
-	append_send_queue(batch, 2256);
+	for (int i = 0; i < 32; i++)
+	{
+		schedule_byte(COMMAND_READ, 128+16*i);
+		schedule_byte(15, 128+16*i);
+		schedule_byte(0, 128+16*i);
+		schedule_byte(0, 128+16*i);
+		schedule_byte(COMMAND_READOUT, 512+16*i);
+		schedule_byte(COMMAND_READOUT, 512+16*i);
+		schedule_byte(COMMAND_READOUT, 512+16*i);
+		schedule_byte(COMMAND_READOUT, 512+16*i);
+	}
 	
 	int samples_to_process = (n_samples < MAX_SAMPLES) ? n_samples : MAX_SAMPLES;
 	if (!use_wavs)
@@ -452,8 +450,9 @@ int main(int argc, char** argv)
 			samples_processed++;
 			t += sample_duration;
 			
-			//io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1200.0f * t/* * ((float)samples_processed / (float)samples_to_process)*/) * 32767.0 * 1.0f));
-			io.sample_in = static_cast<int16_t>(in_samples[samples_processed]);
+			io.sample_in = (uint16_t)(roundf((0.5 * sinf(6.28 * 300.0f * t) + 0.25 * sin(6.28 * 200.0f * t)) * 32767.0));
+			//io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1200.0f * t/* * ((float)samples_processed / (float)samples_to_process)*/) * 32767.0 * expf(-(float)samples_processed * 0.001)));
+			//io.sample_in = static_cast<int16_t>(in_samples[samples_processed]);
 			//io.sample_in = (rand() % 32767) - (1 << 14);
 			
 			if (use_wavs)
