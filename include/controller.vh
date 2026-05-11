@@ -20,7 +20,7 @@
 `define COMMAND_READ				8'd38
 `define COMMAND_ENABLE_TAIL			8'd39
 
-`define COMMAND_READ_COMMAND_LOG	8'd33
+`define DATA_REQ_COMMAND_LOG		8'd33
 
 // If we're in a 'waiting' state, but no new data has
 // appeared for a while, then it's likely
