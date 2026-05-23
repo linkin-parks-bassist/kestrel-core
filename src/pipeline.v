@@ -265,7 +265,7 @@ module dsp_pipeline #(
 	
     wire stuck_filter;
 	
-	filter_master #(.data_width(data_width), .math_width(data_width), .n_filters(`N_FILTERS), .mem_size(128)) filters (
+	filter_master #(.data_width(data_width), .math_width(`FILTER_COEF_WIDTH), .n_filters(`N_FILTERS), .mem_size(128)) filters (
 		.clk(clk),
 		.reset(reset | resetting),
 		

@@ -1,6 +1,7 @@
-`define SAMPLE_IO_WIDTH 16
-`define SAMPLE_WIDTH 	24
-`define N_BLOCKS		256
+`define SAMPLE_IO_WIDTH 	16
+`define SAMPLE_WIDTH 		16
+`define FILTER_COEF_WIDTH	18
+`define N_BLOCKS			256
 
 `define CLOCK_SPEED 112500000
 `define SAMPLE_RATE 44100
