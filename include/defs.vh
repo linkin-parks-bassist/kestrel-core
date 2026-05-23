@@ -11,6 +11,9 @@
 //`define ENABLE_SVF
 //`define ENABLE_LUTS
 
+`define N_FILTERS 8
+`define N_DELAYS  8
+
 `define FILTER_REQ_TYPE_FILTER		4'b0000
 `define FILTER_REQ_TYPE_FCASC		4'b0001
 `define FILTER_REQ_TYPE_SVF			4'b0010
