@@ -5,7 +5,7 @@
 
 `default_nettype none
 
-module resource_branch #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
+module resource_branch #(parameter integer data_width, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
 		input wire clk,
 		input wire reset,
 		
@@ -128,7 +128,7 @@ module resource_branch #(parameter data_width = 16, parameter handle_width = 8, 
 	end
 endmodule
 
-module resource_branch_pulsed #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
+module resource_branch_pulsed #(parameter integer data_width, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
 		input wire clk,
 		input wire reset,
 		
@@ -259,7 +259,7 @@ module resource_branch_pulsed #(parameter data_width = 16, parameter handle_widt
 	end
 endmodule
 
-module resource_branch_filter #(parameter data_width = 16, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
+module resource_branch_filter #(parameter integer data_width, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
 		input wire clk,
 		input wire reset,
 		

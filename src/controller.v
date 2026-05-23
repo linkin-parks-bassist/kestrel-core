@@ -1,13 +1,14 @@
 `include "controller.vh"
 `include "instr_dec.vh"
 `include "core.vh"
+`include "defs.vh"
 
 `default_nettype none
 
 module control_unit
 	#(
 		parameter n_blocks 			= 256,
-		parameter data_width 		= 16,
+		parameter integer data_width,
 		parameter filter_width		= 18
 	)
 	(
@@ -134,10 +135,10 @@ module control_unit
 	wire ready = (state == READY);
 	
 	localparam block_bytes 		 = 2;
-	localparam data_bytes		 = 2;
+	localparam data_bytes		 = data_width / 8;
 	localparam instr_bytes   	 = 4;
 	localparam delay_addr_bytes  = 3;
-	localparam max_bytes_needed  = 6;
+	localparam max_bytes_needed  = 8;
 	localparam filter_coef_bytes = 3;
 	
 	reg [$clog2(max_bytes_needed) : 0] byte_ctr;
@@ -410,7 +411,7 @@ module control_unit
 							end
 							
 							`COMMAND_ALLOC_FILTER: begin
-								bytes_needed <= data_bytes + data_bytes + 1;
+								bytes_needed <= 3;
 								if (!programming) ignore_command <= 1;
 							end
 							
@@ -550,7 +551,7 @@ module control_unit
 									bytes_needed <= 1 + 2;
 								end
 								
-								`COMMAND_READ_COMMAND_LOG: begin
+								`DATA_REQ_COMMAND_LOG: begin
 									returned_data <= command_log;
 									push_command_log <= 0;
 									readout_n_bytes <= 8;
@@ -617,7 +618,7 @@ module control_unit
 						`COMMAND_WRITE_BLOCK_REG_0: begin
 							timeout_active <= 1;
 							if (!pipelines_swapping && !pipeline_resetting[back_pipeline] && !pipeline_regfiles_syncing[back_pipeline]) begin
-								data_out <= {byte_1_in, byte_0_in};
+								data_out <= bytes_in[data_width - 1 : 0];
 								block_reg_0_write[back_pipeline] <= 1;
 								state <= READY;
 							end
@@ -626,7 +627,7 @@ module control_unit
 						`COMMAND_WRITE_BLOCK_REG_1: begin
 							timeout_active <= 1;
 							if (!pipelines_swapping && !pipeline_resetting[back_pipeline] && !pipeline_regfiles_syncing[back_pipeline]) begin
-								data_out <= {byte_1_in, byte_0_in};
+								data_out <= bytes_in[data_width - 1 : 0];
 								block_reg_1_write[back_pipeline] <= 1;
 								state <= READY;
 							end
@@ -655,20 +656,20 @@ module control_unit
 							if (pipelines_swapping) begin
 								state <= READY;
 							end else if (!pipeline_regfiles_syncing[front_pipeline]) begin
-								data_out <= {byte_1_in, byte_0_in};
+								data_out <= bytes_in[data_width - 1 : 0];
 								block_reg_1_write[front_pipeline] <= 1;
 								state <= READY;
 							end
 						end
 						
 						`COMMAND_SET_INPUT_GAIN: begin
-							data_out <= {byte_1_in, byte_0_in};
+							data_out <= bytes_in[data_width - 1 : 0];
 							set_input_gain <= 1;
 							state <= READY;
 						end
 
 						`COMMAND_SET_OUTPUT_GAIN: begin
-							data_out <= {byte_1_in, byte_0_in};
+							data_out <= bytes_in[data_width - 1 : 0];
 							set_output_gain <= 1;
 							state <= READY;
 						end
@@ -684,7 +685,7 @@ module control_unit
 						`COMMAND_WRITE_FILTER_COEF: begin
 							filter_coef_write_handle_out <= {byte_5_in};
 							filter_coef_target_out <= {byte_4_in, byte_3_in};
-							filter_coef_data_out <= {byte_2_in[1:0], byte_1_in, byte_0_in};
+							filter_coef_data_out <= bytes_in[data_width - 1 : 0];
 							filter_coef_write[back_pipeline] <= 1;
 							filter_coef_commit[back_pipeline] <= 1;
 							busy_flag <= 1;
@@ -701,7 +702,7 @@ module control_unit
 						`COMMAND_UPDATE_FILTER_COEF: begin
 							filter_coef_write_handle_out <= {byte_5_in};
 							filter_coef_target_out <= {byte_4_in, byte_3_in};
-							filter_coef_data_out <= {byte_2_in[1:0], byte_1_in, byte_0_in};
+							filter_coef_data_out <= bytes_in[data_width - 1 : 0];
 							filter_coef_write[front_pipeline] <= 1;
 							filter_coef_commit[front_pipeline] <= 0;
 							busy_flag <= 1;

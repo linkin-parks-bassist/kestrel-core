@@ -1,6 +1,6 @@
 `include "defs.vh"
 
-module filter_master #(parameter data_width = 16, parameter math_width = 18, parameter n_filters = 128, parameter mem_size = 2048)
+module filter_master #(parameter integer data_width, parameter integer math_width, parameter n_filters = 128, parameter mem_size = 2048)
 	(
 		input wire clk,
 		input wire reset,
@@ -75,9 +75,9 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
             coef_write_r <= coef_write;
             coef_commit_r <= coef_commit;
             
-            alloc_format_r <= ctrl_data_in[2 * data_width + 8 - 1 : 2 * data_width];
-            order_ff_r <= ctrl_data_in[2 * data_width - 1 : data_width];
-            order_fb_r <= ctrl_data_in[data_width - 1 : 0];
+            order_fb_r <= ctrl_data_in[7 : 0];
+            order_ff_r <= ctrl_data_in[15 : 8];
+            alloc_format_r <= ctrl_data_in[23 : 16];
 
             coef_write_handle_r <= ctrl_data_in[6 * 8 - 1 : 5 * 8];
             coef_commit_handle_r <= ctrl_data_in[7 : 0];
@@ -190,8 +190,8 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 	reg [data_width - 1 : 0] counter;
 	
 	reg [handle_width - 1 : 0] handle_r;
-	reg [4:0] format;
-	reg [4:0] shift;
+	reg [5:0] format;
+	reg [8:0] shift;
 	reg coef_bank;
 	
 	reg calculating;
@@ -371,7 +371,7 @@ module filter_master #(parameter data_width = 16, parameter math_width = 18, par
 						accumulator <= product_sum;
 						run_state <= SHIFT;
 						
-						shift <= 17 - format;
+						shift <= math_width - 1 - format;
 						
 						if (!poly_mode) begin
 							state_mem_write_addr   <= state_mem_read_addr_prev;

@@ -1,6 +1,6 @@
 `default_nettype none
 
-module commit_stage #(parameter data_width = 16, parameter n_blocks = 256, parameter n_channels = 16)
+module commit_stage #(parameter integer data_width, parameter n_blocks = 256, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,

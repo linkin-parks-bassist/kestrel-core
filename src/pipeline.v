@@ -10,7 +10,7 @@
 `define PIPELINE_INVALID	 	2
 
 module dsp_pipeline #(
-		parameter data_width 		= 16,
+		parameter integer data_width,
 		parameter filter_width		= 18,
 		parameter n_blocks 			= 256,
 		parameter sdram_addr_width  = 22
@@ -261,7 +261,7 @@ module dsp_pipeline #(
 	
     wire stuck_filter;
 	
-	filter_master #(.data_width(data_width), .n_filters(32), .mem_size(1024)) filters (
+	filter_master #(.data_width(data_width), .math_width(data_width), .n_filters(32), .mem_size(1024)) filters (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -310,6 +310,7 @@ module dsp_pipeline #(
 	
 	wire [4 : 0] svf_shift_in;
 	
+	`ifdef ENABLE_SVF
 	svf_master #(.data_width(data_width), .math_width(18), .block_addr_width($clog2(n_blocks)), .n_slots(32)) svf
 	(
 		.clk(clk),
@@ -336,6 +337,9 @@ module dsp_pipeline #(
 		
 		.slot_alloc_fail(svf_slot_alloc_fail)
 	);
+	`else
+	assign svf_ack = 0;
+	`endif
 	
 	/**********/
 	/* Wiring */

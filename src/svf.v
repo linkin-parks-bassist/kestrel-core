@@ -1,4 +1,4 @@
-module svf_master #(parameter data_width, parameter math_width, parameter block_addr_width, parameter n_slots)
+module svf_master #(parameter integer data_width, parameter math_width, parameter block_addr_width, parameter n_slots)
 	(
 		input wire clk,
 		input wire reset,

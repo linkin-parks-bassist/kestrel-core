@@ -5,7 +5,7 @@
 
 `default_nettype none
 
-module operand_fetch_substage #(parameter data_width = 16, parameter n_blocks = 256, parameter bit last = 0, parameter n_channels = 16)
+module operand_fetch_substage #(parameter integer data_width, parameter n_blocks = 256, parameter bit last = 0, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,
@@ -552,7 +552,7 @@ module operand_fetch_substage #(parameter data_width = 16, parameter n_blocks = 
 	end
 endmodule
 
-module operand_fetch_stage #(parameter data_width = 16, parameter n_blocks = 256, parameter n_channels = 16)
+module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 256, parameter n_channels = 16)
 	(
 		input  wire clk,
 		input  wire reset,

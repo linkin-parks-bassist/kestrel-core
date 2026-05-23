@@ -2,7 +2,7 @@
 
 `default_nettype none
 
-module instr_decoder #(parameter data_width = 16)
+module instr_decoder #(parameter integer data_width)
 	(
 		input wire clk,
 

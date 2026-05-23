@@ -5,7 +5,7 @@
 
 module dsp_engine #(
 		parameter n_blocks 			= 256,
-		parameter data_width 		= 16,
+		parameter integer data_width,
 		parameter spi_fifo_length	= 32,
 		parameter sdram_addr_width,
 		parameter sdram_size

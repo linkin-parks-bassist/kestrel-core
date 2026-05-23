@@ -2,7 +2,7 @@
 
 module combinatorial_interp
 	#(
-		parameter data_width = 16,
+		parameter integer data_width,
 		parameter interp_bits = 4
 	)
 	(
@@ -48,7 +48,7 @@ module combinatorial_interp
 endmodule
 
 
-module sequential_interp #(parameter data_width = 16, parameter interp_bits = 3)
+module sequential_interp #(parameter integer data_width, parameter interp_bits = 3)
 	(
 		input wire clk,
 		input wire reset,

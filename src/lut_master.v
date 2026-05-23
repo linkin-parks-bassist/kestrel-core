@@ -14,7 +14,7 @@
 
 `default_nettype none
 
-module lut_master #(parameter data_width = 16) (
+module lut_master #(parameter integer data_width) (
 		input wire clk,
 		input wire reset,
 		

@@ -6,7 +6,7 @@
 `define BIQUAD_STATE_CALC5 5
 
 
-module biquad_unit #(parameter data_width = 16)
+module biquad_unit #(parameter integer data_width)
 (
 	input wire clk,
 	input wire reset,

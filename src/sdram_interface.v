@@ -1,4 +1,4 @@
-module sdram_interface #(parameter data_width = 16, parameter addr_width = 21, parameter sdram_size = (1 << addr_width))
+module sdram_interface #(parameter integer data_width, parameter addr_width = 21, parameter sdram_size = (1 << addr_width))
 	(
 		input wire clk,
 		input wire reset,

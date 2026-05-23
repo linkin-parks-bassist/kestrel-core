@@ -1,6 +1,6 @@
 `default_nettype none
 
-module block_regfile #(parameter data_width = 16, parameter n_blocks = 256)
+module block_regfile #(parameter integer data_width, parameter n_blocks = 256)
 	(
 		input wire clk,
 		input wire reset,

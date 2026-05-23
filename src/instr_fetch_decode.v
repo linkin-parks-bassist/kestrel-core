@@ -5,7 +5,7 @@
 
 `default_nettype none
 
-module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
+module block_fetcher #(parameter integer data_width, parameter n_blocks = 256)
 	(
 		input wire clk,
 		input wire reset,
@@ -119,7 +119,7 @@ module block_fetcher #(parameter data_width = 16, parameter n_blocks = 256)
 	end
 endmodule
 
-module block_buffer #(parameter data_width = 16, parameter n_blocks = 256)
+module block_buffer #(parameter integer data_width, parameter n_blocks = 256)
 	(
 		input wire clk,
 		input wire reset,
@@ -223,7 +223,7 @@ module block_buffer #(parameter data_width = 16, parameter n_blocks = 256)
 	end
 endmodule
 
-module instr_decode_stage #(parameter data_width = 16, parameter n_blocks = 256)
+module instr_decode_stage #(parameter integer data_width, parameter n_blocks = 256)
 	(
 		input wire clk,
 		input wire reset,
@@ -417,7 +417,7 @@ module instr_decode_stage #(parameter data_width = 16, parameter n_blocks = 256)
 endmodule
 
 
-module block_fetch_decode_stage #(parameter data_width = 16, parameter n_blocks = 256)
+module block_fetch_decode_stage #(parameter integer data_width, parameter n_blocks = 256)
 	(
 		input  wire clk,
 		input  wire reset,

@@ -1,6 +1,6 @@
 `default_nettype none
 
-module fifo_buffer #(parameter data_width = 8, parameter n = 16)
+module fifo_buffer #(parameter integer data_width = 8, parameter n = 16)
 	(
 		input wire clk,
 		input wire reset,

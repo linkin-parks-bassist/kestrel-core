@@ -2,7 +2,7 @@
 
 `default_nettype none
 
-module delay_master #(parameter data_width  = 16,
+module delay_master #(parameter integer data_width,
 					  parameter n_buffers   = 32,
 					  parameter addr_width  = 20)
 	(

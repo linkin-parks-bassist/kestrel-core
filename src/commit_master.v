@@ -4,7 +4,7 @@
 
 `default_nettype none
 
-module commit_master #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
+module commit_master #(parameter integer data_width, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,

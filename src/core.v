@@ -19,7 +19,7 @@
  */
 
 module dsp_core #(
-		parameter integer data_width 		= 16,
+		parameter integer data_width,
 		parameter integer acc_width			= 2 * data_width + 8,
 		parameter integer n_blocks			= 256,
 		parameter integer sdram_addr_width 	= 20,

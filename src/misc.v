@@ -2,7 +2,7 @@
 
 `default_nettype none
 
-module misc_branch_stage_1 #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
+module misc_branch_stage_1 #(parameter integer data_width, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,
@@ -151,7 +151,7 @@ module misc_branch_stage_1 #(parameter data_width = 16, parameter n_blocks = 256
 	end
 endmodule
 
-module misc_branch_stage_2 #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
+module misc_branch_stage_2 #(parameter integer data_width, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,
@@ -302,7 +302,7 @@ module misc_branch_stage_2 #(parameter data_width = 16, parameter n_blocks = 256
 endmodule
 
 
-module misc_branch_stage_3 #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
+module misc_branch_stage_3 #(parameter integer data_width, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,
@@ -408,7 +408,7 @@ module misc_branch_stage_3 #(parameter data_width = 16, parameter n_blocks = 256
 
 endmodule
 
-module misc_branch #(parameter data_width = 16, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
+module misc_branch #(parameter integer data_width, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
 		input wire reset,

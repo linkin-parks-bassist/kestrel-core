@@ -18,7 +18,7 @@
 
 `default_nettype none
 
-module gain_controller #(parameter data_width = 16, parameter shift = 5)
+module gain_controller #(parameter integer data_width, parameter shift = 5)
 	(
 		input wire clk,
 		input wire reset,
@@ -140,7 +140,7 @@ module gain_controller #(parameter data_width = 16, parameter shift = 5)
 	end
 endmodule
 
-module bimultiplier #(parameter data_width = 16, parameter shift = 0)
+module bimultiplier #(parameter integer data_width, parameter shift = 0)
 	(
 		input wire clk,
 		input wire reset,
@@ -232,7 +232,7 @@ module bimultiplier #(parameter data_width = 16, parameter shift = 0)
 	
 endmodule
 
-module mixer #(parameter data_width = 16, parameter shift = 4)
+module mixer #(parameter integer data_width, parameter shift = 4)
 	(
 		input wire clk,
 		input wire reset,
@@ -269,9 +269,9 @@ module mixer #(parameter data_width = 16, parameter shift = 4)
 	wire envelope_a_valid;
 	wire envelope_b_valid;
 	
-	envelope_follower env_a
+	envelope_follower #(.data_width(data_width)) env_a
 		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_sample_in_a), .sample_valid(out_samples_valid), .envelope(envelope_a), .envelope_valid(envelope_a_valid));
-	envelope_follower env_b
+	envelope_follower #(.data_width(data_width)) env_b
 		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_sample_in_b), .sample_valid(out_samples_valid), .envelope(envelope_b), .envelope_valid(envelope_b_valid));
 	
 	wire signed [data_width - 1 : 0] input_gain;
@@ -280,7 +280,7 @@ module mixer #(parameter data_width = 16, parameter shift = 4)
 	wire signed [data_width - 1 : 0] output_gain;
 	wire signed [data_width - 1 : 0] output_gains [1:0];
 	
-	gain_controller #(.shift(shift)) gain_ctrl
+	gain_controller #(.data_width(data_width), .shift(shift)) gain_ctrl
 		(
 			.clk(clk),
 			.reset(reset),
@@ -309,7 +309,7 @@ module mixer #(parameter data_width = 16, parameter shift = 4)
 	
 	wire output_gain_valid;
 	
-	bimultiplier #(.shift(shift)) input_gain_applier
+	bimultiplier #(.data_width(data_width), .shift(shift)) input_gain_applier
 		(
 			.clk(clk),
 			.reset(reset),
@@ -333,7 +333,7 @@ module mixer #(parameter data_width = 16, parameter shift = 4)
 	wire signed [data_width - 1 : 0] out_sample_a_amp;
 	wire signed [data_width - 1 : 0] out_sample_b_amp;
 	
-	bimultiplier #(.shift(shift)) output_gain_applier
+	bimultiplier #(.data_width(data_width), .shift(shift)) output_gain_applier
 		(
 			.clk(clk),
 			.reset(reset),

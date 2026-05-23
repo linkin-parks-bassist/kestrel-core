@@ -1,10 +1,9 @@
+`include "defs.vh"
+
 `default_nettype none
 
-module top #(
-		parameter n_blocks 			= 256,
-		parameter data_width 		= 16,
-		parameter spi_fifo_length	= 16
-	) (
+module top 
+	(
 		`ifndef verilator
 		input wire crystal,
 		`else
@@ -45,14 +44,17 @@ module top #(
 		output wire  [3:0] O_sdram_dqm        // 32/4
 	);
 	
+	localparam data_width 	= `SAMPLE_WIDTH;
+	localparam n_blocks		= `N_BLOCKS;
+	
 	/**********/
 	/* Engine */
 	/**********/
 	
 	dsp_engine #(
-		.n_blocks(n_blocks),
-		.data_width(data_width),
-		.spi_fifo_length(spi_fifo_length),
+		.n_blocks(`N_BLOCKS),
+		.data_width(`SAMPLE_WIDTH),
+		.spi_fifo_length(`SPI_FIFO_LENGTH),
 		.sdram_addr_width(sdram_addr_width),
 		.sdram_size(sdram_size)
 	) engine (
@@ -236,11 +238,27 @@ module top #(
 	wire [data_width - 1 : 0] sample_out;
 	wire [data_width - 1 : 0] sample_in;
 
-	i2s_trx #(.sample_size(data_width)) i2s_driver (
+	wire [`SAMPLE_IO_WIDTH - 1 : 0] sample_out_iow;
+	wire [`SAMPLE_IO_WIDTH - 1 : 0] sample_in_iow;
+	
+	generate
+		if (data_width > `SAMPLE_IO_WIDTH) begin
+			assign sample_out_iow = sample_out[data_width - 1 : data_width - `SAMPLE_IO_WIDTH];
+			assign sample_in = {sample_in_iow, {(data_width - `SAMPLE_IO_WIDTH){1'b0}}};
+		end else if (data_width < `SAMPLE_IO_WIDTH) begin
+			assign sample_out_iow = {sample_out, {(data_width - `SAMPLE_IO_WIDTH){1'b0}}};
+			assign sample_in = sample_in_iow[`SAMPLE_IO_WIDTH - 1 : `SAMPLE_IO_WIDTH - data_width];
+		end else begin
+			assign sample_out_iow = sample_out;
+			assign sample_in = sample_in_iow;
+		end
+	endgenerate
+
+	i2s_trx #(.sample_size(`SAMPLE_IO_WIDTH)) i2s_driver (
 		.sys_clk(sys_clk), .bclk(bclk), .lrclk(lrclk), .din(i2s_din), .dout(i2s_dout),
 		.enable(1'b1), .reset(reset), .rx_valid(sample_valid),
-		.tx_l(sample_out), .tx_r(sample_out),
-		.rx_l(sample_in), .rx_r()
+		.tx_l(sample_out_iow), .tx_r(sample_out),
+		.rx_l(sample_in_iow), .rx_r()
 	);
 	
 	// SPI
@@ -358,7 +376,7 @@ module top #(
 	wire [63:0] sdram_write_count;
 	
 	`ifdef USE_BRAM_INSTEAD
-	bram_standin #(.data_width(data_width), .mem_size(sdram_size), .addr_width(sdram_addr_width)) fake_sdram (
+	bram_standin #(.data_width(`SAMPLE_WIDTH), .mem_size(sdram_size), .addr_width(sdram_addr_width)) fake_sdram (
 			.clk(sys_clk),
 			.reset(reset),
 			
@@ -380,7 +398,7 @@ module top #(
 	
 	`else
 	sdram  #(
-			.data_width(data_width),
+			.data_width(`SAMPLE_WIDTH),
 			
 			.FREQ(112_500_000),
 			
@@ -427,7 +445,7 @@ module top #(
 	`endif
 endmodule
 
-module bram_standin #(parameter data_width = 16, parameter mem_size = 8192, parameter addr_width = $clog2(mem_size)) (
+module bram_standin #(parameter integer data_width, parameter mem_size = 8192, parameter addr_width = $clog2(mem_size)) (
 	input wire clk,
 	input wire reset,
 	

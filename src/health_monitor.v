@@ -1,4 +1,4 @@
-module envelope_follower #(parameter data_width = 16)
+module envelope_follower #(parameter integer data_width)
 	(
 		input wire clk,
 		input wire enable,
@@ -59,7 +59,7 @@ module envelope_follower #(parameter data_width = 16)
 	end
 endmodule
 
-module health_monitor #(parameter data_width = 16)
+module health_monitor #(parameter integer data_width)
 	(
 		input wire clk,
 		input wire enable,
@@ -153,5 +153,5 @@ module health_monitor #(parameter data_width = 16)
 	wire env1_valid;
 	wire [data_width - 1 : 0] env1;
 	
-	envelope_follower tef (.clk(clk), .reset(reset), .enable(1), .sample_in(sample_in), .sample_valid(sample_valid), .envelope(env1), .envelope_valid(env1_valid));
+	envelope_follower #(.data_width(data_width)) tef (.clk(clk), .reset(reset), .enable(1), .sample_in(sample_in), .sample_valid(sample_valid), .envelope(env1), .envelope_valid(env1_valid));
 endmodule
