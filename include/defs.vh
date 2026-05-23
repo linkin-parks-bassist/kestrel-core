@@ -9,6 +9,7 @@
 `define SPI_FIFO_LENGTH 16
 
 //`define ENABLE_SVF
+//`define ENABLE_LUTS
 
 `define FILTER_REQ_TYPE_FILTER		4'b0000
 `define FILTER_REQ_TYPE_FCASC		4'b0001

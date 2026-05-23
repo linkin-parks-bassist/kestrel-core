@@ -176,6 +176,7 @@ module dsp_pipeline #(
 	/************************/
 	
 	// Lookup tables, for function calls
+	`ifdef ENABLE_LUTS
 	lut_master #(.data_width(data_width)) luts (
 		.clk(clk),
 		.reset(reset | full_reset),
@@ -191,6 +192,9 @@ module dsp_pipeline #(
 		
 		.invalid_request(invalid_lut_request)
 	);
+	`else
+	assign lut_valid = 0;
+	`endif
 	
 	// Delay buffers
 	localparam delay_mem_addr_width = sdram_addr_width;
