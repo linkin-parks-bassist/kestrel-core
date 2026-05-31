@@ -20,7 +20,7 @@ module operand_fetch_substage #(parameter integer data_width, parameter n_blocks
 		output reg out_valid,
 		input wire out_ready,
 		
-		input wire [$clog2(n_blocks) - 1 : 0] n_blocks_running,
+		input wire [$clog2(n_blocks) : 0] n_blocks_running,
 		
 		input wire [$clog2(n_blocks) - 1 : 0] block_in,
 		output reg [$clog2(n_blocks) - 1 : 0] block_out,
@@ -567,7 +567,7 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 		output wire out_valid,
 		input  wire out_ready,
 		
-		input  wire [$clog2(n_blocks) - 1 : 0] n_blocks_running,
+		input  wire [$clog2(n_blocks) : 0] n_blocks_running,
 		
 		input  wire [$clog2(n_blocks) - 1 : 0] block_in,
 		output wire [$clog2(n_blocks) - 1 : 0] block_out,

@@ -15,7 +15,7 @@ module block_fetcher #(parameter integer data_width, parameter n_blocks = 256)
 		output reg out_valid,
 		input wire out_ready,
 		
-		input wire [$clog2(n_blocks) - 1 : 0] n_blocks_running,
+		input wire [$clog2(n_blocks) : 0] n_blocks_running,
 		output reg [$clog2(n_blocks) - 1 : 0] block_read_addr,
 		
 		output reg [$clog2(n_blocks) - 1 : 0] block_out,
@@ -427,7 +427,7 @@ module block_fetch_decode_stage #(parameter integer data_width, parameter n_bloc
 		output wire out_valid,
 		input  wire out_ready,
 		
-		input  wire [$clog2(n_blocks) - 1 : 0] n_blocks_running,
+		input  wire [$clog2(n_blocks) : 0] n_blocks_running,
 		output wire [$clog2(n_blocks) - 1 : 0] block_read_addr,
 		
 		input  wire [data_width - 1 : 0] register_0_in,

@@ -50,7 +50,7 @@ module dsp_pipeline #(
 
 		output wire[7:0] out,
 
-		output wire [$clog2(n_blocks) - 1 : 0] n_blocks_running,
+		output wire [$clog2(n_blocks) : 0] n_blocks_running,
 		output wire [31:0] commits_accepted,
 		
 		output wire sdram_req,

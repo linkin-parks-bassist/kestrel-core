@@ -5,7 +5,7 @@ module block_regfile #(parameter integer data_width, parameter n_blocks = 256)
 		input wire clk,
 		input wire reset,
 		
-		input wire [$clog2(n_blocks) - 1 : 0] n_active_blocks,
+		input wire [$clog2(n_blocks) : 0] n_active_blocks,
 		
 		input wire [$clog2(n_blocks) - 1 : 0] read_addr,
 		output reg read_valid,
