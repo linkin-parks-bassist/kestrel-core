@@ -43,9 +43,6 @@ module dsp_pipeline #(
 		
 		input wire reg_writes_commit,
 		output wire regfile_syncing,
-		
-		output wire reg_write_ack,
-		output wire instr_write_ack,
 	
 		input wire alloc_delay,
 		input wire alloc_filter,

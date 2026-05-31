@@ -80,7 +80,7 @@ module branch_router #(parameter integer data_width, parameter n_blocks = 256, p
 	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
 	
 	always @(posedge clk) begin
-		if (reset | (out_valid & out_ready[branch_out]))
+		if (reset | (out_valid[branch_out] & out_ready[branch_out]))
 			stuck_ctr <= 0;
 		else if (enable && stuck_ctr < `CYCLES_PER_SAMPLE)
 			stuck_ctr <= stuck_ctr + 1;
