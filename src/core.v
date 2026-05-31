@@ -271,7 +271,7 @@ module dsp_core #(
 					end
 					
 					`DATA_REQ_MEM: begin
-						if (mem_write_enable && mem_write_addr == block_data_req_addr) begin
+						if (mem_write_enable && mem_write_addr == mem_data_req_addr) begin
 							data_return <= mem_write_val;
 							data_return_valid <= 1;
 							data_req_active <= 0;

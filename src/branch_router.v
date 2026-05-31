@@ -68,7 +68,7 @@ module branch_router #(parameter integer data_width, parameter n_blocks = 256, p
 		input wire signed [acc_width - 1 : 0] accumulator_in,
 		output reg signed [acc_width - 1 : 0] accumulator_out,
 
-		input wire [`N_INSTR_BRANCHES - 1 : 0] branch,
+		input wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch,
 		
 		input wire [3:0] flags_in,
 		output reg [3:0] flags_out,
@@ -86,7 +86,7 @@ module branch_router #(parameter integer data_width, parameter n_blocks = 256, p
 			stuck_ctr <= stuck_ctr + 1;
 	end
 	
-	reg [`N_INSTR_BRANCHES - 1 : 0] branch_out;
+	reg [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_out;
 	
 	assign in_ready = ~(|out_valid) | out_ready[branch_out];
 	

@@ -1,7 +1,7 @@
 `include "instr_dec.vh"
 
-`include "lut.vh"
 `include "core.vh"
+`include "lut.vh"
 
 `default_nettype none
 
@@ -631,8 +631,8 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 		input  wire commit_flag_in,
 		output wire commit_flag_out,
 		
-		input  wire [`N_INSTR_BRANCHES - 1 : 0] branch_in,
-		output wire [`N_INSTR_BRANCHES - 1 : 0] branch_out,
+		input  wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_in,
+		output wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_out,
 		
 		input  wire [ch_addr_w - 1 : 0] channel_write_addr,
 		input  wire signed [data_width - 1 : 0] channel_write_val,
@@ -695,7 +695,7 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 	wire accumulator_needed_1_out;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_1_out;
 	wire commit_flag_1_out;
-	wire [`N_INSTR_BRANCHES - 1 : 0] branch_1_out;
+	wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_1_out;
 	wire [3:0] flags_1_out;
 	
 	operand_fetch_substage #(.data_width(data_width), .n_blocks(n_blocks), .last(0), .n_channels(n_channels)) fetch_1
@@ -841,7 +841,7 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 	wire accumulator_needed_2_out;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_2_out;
 	wire commit_flag_2_out;
-	wire [`N_INSTR_BRANCHES - 1 : 0] branch_2_out;
+	wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_2_out;
 	wire [3:0] flags_2_out;
 	
 	operand_fetch_substage #(.data_width(data_width), .n_blocks(n_blocks), .last(0), .n_channels(n_channels)) fetch_2
@@ -984,7 +984,7 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 	wire accumulator_needed_3_out;
 	wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_3_out;
 	wire commit_flag_3_out;
-	wire [`N_INSTR_BRANCHES - 1 : 0] branch_3_out;
+	wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_3_out;
 	wire [3:0] flags_3_out;
 
 	operand_fetch_substage #(.data_width(data_width), .n_blocks(n_blocks), .last(1), .n_channels(n_channels)) fetch_3
@@ -1094,7 +1094,7 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 	);
 	
 	localparam payload_width = 
-		$clog2(n_blocks)+data_width+data_width+5+$clog2(`N_MISC_OPS)+ch_addr_w+data_width+data_width+data_width+1+1+5+1+8+1+1+1+$clog2(`N_INSTR_BRANCHES)+6+3;
+		$clog2(n_blocks)+data_width+data_width+5+$clog2(`N_MISC_OPS)+ch_addr_w+data_width+data_width+data_width+1+1+5+1+8+1+`COMMIT_ID_WIDTH+1+$clog2(`N_INSTR_BRANCHES)+4;
 	
 	wire in_ready_skid;
 	

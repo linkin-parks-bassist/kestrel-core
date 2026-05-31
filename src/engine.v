@@ -77,7 +77,7 @@ module dsp_engine #(
 		.reg_write_ack(reg_write_acks[0]),
 		
 		.reg_writes_commit(pipeline_a_reg_writes_commit),
-		.regfile_syncing(pipeline_b_regfile_syncing),
+		.regfile_syncing(pipeline_a_regfile_syncing),
 	
 		.alloc_delay(pipeline_a_alloc_delay),
 		.alloc_filter(pipeline_a_alloc_filter),
@@ -129,7 +129,7 @@ module dsp_engine #(
 		.reg_1_write(pipeline_b_block_reg_1_write),
 		
 		.reg_writes_commit(pipeline_b_reg_writes_commit),
-		.regfile_syncing(pipeline_a_regfile_syncing),
+		.regfile_syncing(pipeline_b_regfile_syncing),
 	
 		.alloc_delay(pipeline_b_alloc_delay),
 		.alloc_filter(pipeline_b_alloc_filter),
