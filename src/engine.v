@@ -74,7 +74,6 @@ module dsp_engine #(
 		.ctrl_data(ctrl_data_out),
 		.reg_0_write(pipeline_a_block_reg_0_write),
 		.reg_1_write(pipeline_a_block_reg_1_write),
-		.reg_write_ack(reg_write_acks[0]),
 		
 		.reg_writes_commit(pipeline_a_reg_writes_commit),
 		.regfile_syncing(pipeline_a_regfile_syncing),
@@ -512,8 +511,6 @@ module dsp_engine #(
 	reg [7:0] state = `ENGINE_STATE_READY;
 
 	reg inp_fifo_waiting = 0;
-
-	wire [1:0] reg_write_acks;
 	
 	wire set_input_gain;
 	wire set_output_gain;
