@@ -32,27 +32,29 @@ module sdram
 #(
     // Clock frequency, max 66.7Mhz with current set of T_xx/CAS parameters.
     parameter         FREQ = 64_800_000,  
+    
     parameter         DATA_WIDTH = 32,
-    parameter		  data_width = 16,
-    parameter         ROW_WIDTH = 11,  // 2K rows
-    parameter         COL_WIDTH = 8,   // 256 words per row (1Kbytes)
+    parameter         ROW_WIDTH  = 11,  // 2K rows
+    parameter         COL_WIDTH  = 8,   // 256 words per row (1Kbytes)
     parameter         BANK_WIDTH = 2,  // 4 banks
+
+    parameter		  data_width = 16,
 
     // Time delays for 66.7Mhz max clock (min clock cycle 15ns)
     // The SDRAM supports max 166.7Mhz (RP/RCD/RC need changes)
-    parameter [3:0]   CAS  = 4'd2,     // 2/3 cycles, set in mode register
-    parameter [3:0]   T_WR = 4'd2,     // 2 cycles, write recovery
-    parameter [3:0]   T_MRD= 4'd2,     // 2 cycles, mode register set
-    parameter [3:0]   T_RP = 4'd1,     // 15ns, precharge to active
-    parameter [3:0]   T_RCD= 4'd1,     // 15ns, active to r/w
-    parameter [3:0]   T_RC = 4'd4      // 60ns, ref/active to ref/active
+    parameter integer CAS   = 2,     // 2/3 cycles, set in mode register
+    parameter integer T_WR  = 2,     // 2 cycles, write recovery
+    parameter integer T_MRD = 2,     // 2 cycles, mode register set
+    parameter integer T_RP  = 1,     // 15ns, precharge to active
+    parameter integer T_RCD = 1,     // 15ns, active to r/w
+    parameter integer T_RC  = 4      // 60ns, ref/active to ref/active
 )
 (
     // SDRAM side interface
-    inout wire [DATA_WIDTH-1:0]      SDRAM_DQ,
-    output reg [ROW_WIDTH-1:0]  SDRAM_A,
-    output reg [BANK_WIDTH-1:0] SDRAM_BA,
-    output wire      SDRAM_nCS,    // not strictly necessary, always 0
+    inout wire [DATA_WIDTH -1:0]      SDRAM_DQ,
+    output reg [ROW_WIDTH  -1:0]  SDRAM_A,
+    output reg [BANK_WIDTH -1:0] SDRAM_BA,
+    output wire       SDRAM_nCS,    // not strictly necessary, always 0
     output reg        SDRAM_nWE,
     output reg        SDRAM_nRAS,
     output reg        SDRAM_nCAS,
@@ -68,12 +70,13 @@ module sdram
     input wire        wr,           	// command: write
     input wire        refresh,      	// command: auto refresh. 4096 refresh cycles in 64ms. Once per 15us.
     input wire [21:0] addr,         	// word address, buffered at rd/wr pulse time
-    input wire [data_width - 1 : 0] din,    // data input, buffered at wr pulse time
+    
+    input  wire [data_width - 1 : 0] din,    // data input, buffered at wr pulse time
     output wire [data_width - 1 : 0] dout,   // data output, available 4 cycles after rd becomes 1
-										// output is buffered until next read request
-    output wire [DATA_WIDTH-1:0] dout32, 	// 32-bit data output
-    output reg        data_ready,   	// available 6 cycles after wr is set
-    output reg        busy,          	// 0: ready for next command
+											 // output is buffered until next read request
+    output wire [DATA_WIDTH - 1 : 0] dout32, // 32-bit data output
+    output reg        data_ready,   		 // available 6 cycles after wr is set
+    output reg        busy,          		 // 0: ready for next command
     
     output reg [63:0] read_count,
     output reg [63:0] write_count
@@ -86,10 +89,10 @@ module sdram
 `ifdef naive_sim
 reg [15 : 0] sim_mem [(1 << 21) : 0];
 
-reg  [15 : 0] sim_mem_write_val;
-reg  [15 : 0] sim_mem_read_val;
-reg  [21 : 0] sim_mem_write_addr;
-reg  [21 : 0] sim_mem_read_addr;
+reg [15 : 0] sim_mem_write_val;
+reg [15 : 0] sim_mem_read_val;
+reg [21 : 0] sim_mem_write_addr;
+reg [21 : 0] sim_mem_read_addr;
 
 reg sim_mem_write_enable;
 
@@ -123,33 +126,35 @@ assign SDRAM_CLK = clk_sdram;
 assign SDRAM_CKE = 1'b1;
 assign SDRAM_nCS = 1'b0;
 
+localparam INIT 	= 3'd0;
+localparam CONFIG 	= 3'd1;
+localparam IDLE 	= 3'd2;
+localparam READ 	= 3'd3;
+localparam WRITE 	= 3'd4;
+localparam REFRESH 	= 3'd5;
+
 reg [2:0] state;
-localparam INIT = 3'd0;
-localparam CONFIG = 3'd1;
-localparam IDLE = 3'd2;
-localparam READ = 3'd3;
-localparam WRITE = 3'd4;
-localparam REFRESH = 3'd5;
 
 // RAS# CAS# WE#
-localparam CMD_SetModeReg=3'b000;
-localparam CMD_AutoRefresh=3'b001;
-localparam CMD_PreCharge=3'b010;
-localparam CMD_BankActivate=3'b011;
-localparam CMD_Write=3'b100;
-localparam CMD_Read=3'b101;
-localparam CMD_NOP=3'b111;
+localparam CMD_SetModeReg	= 3'b000;
+localparam CMD_AutoRefresh	= 3'b001;
+localparam CMD_PreCharge	= 3'b010;
+localparam CMD_BankActivate	= 3'b011;
+localparam CMD_Write		= 3'b100;
+localparam CMD_Read			= 3'b101;
+localparam CMD_NOP			= 3'b111;
 
 localparam [2:0] BURST_LEN = 3'b0;      // burst length 1
-localparam BURST_MODE = 1'b0;           // sequential
+localparam 		BURST_MODE = 1'b0;      // sequential
 localparam [10:0] MODE_REG = {4'b0, CAS[2:0], BURST_MODE, BURST_LEN};
 
 localparam addr_offs = $clog2(data_width / 8);
 
-reg cfg_now;            // pulse for configuration
-reg [3:0] cycle;        // each operation (config/read/write) are max 7 cycles
-reg [data_width - 1 : 0] din_buf;      // set at wr=1 pulse time
+reg cfg_now;            				// pulse for configuration
+reg [data_width - 1 : 0] din_buf;      	// set at wr=1 pulse time
 reg [21:0] addr_buf;
+
+reg [7:0] cycle;
 
 //
 // SDRAM state machine
@@ -160,25 +165,177 @@ always @(posedge clk) begin
 	`endif
 	
     if (~resetn) begin
-        read_count <= 0;
+        read_count  <= 0;
         write_count <= 0;
     end
 
-    cycle <= cycle == 4'd15 ? 4'd15 : cycle + 4'd1;
+    cycle <= cycle == 8'd255 ? 8'd255 : cycle + 8'd1;
     // defaults
-    {SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_NOP; 
-    casex ({state, cycle})
+    {SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_NOP;
+    
+    case (state)
         // wait 200 us on power-on
-        {INIT, 4'bxxxx} : if (cfg_now) begin
+		INIT: if (cfg_now) begin
+			state <= CONFIG;
+            cycle <= 0;
+		end
+		
+		// configuration sequence
+        //  cycle  / 0 \___/ 1 \___/ 2 \___/ ... __/ 6 \___/ ...___/10 \___/11 \___/ 12\___
+        //  cmd            |PC_All |Refresh|       |Refresh|       |  MRD  |       | _next_
+        //                 '-T_RP--`----  T_RC  ---'----  T_RC  ---'------T_MRD----'
+		CONFIG: begin
+			case (cycle)
+				0: begin // precharge all
+					{SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_PreCharge;
+					SDRAM_A[10] <= 1'b1;
+				end
+				
+				T_RP: begin // 1st AutoRefresh
+					{SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_AutoRefresh;
+				end
+				
+				T_RP + T_RC: begin // 2nd AutoRefresh
+					{SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_AutoRefresh;
+				end
+				
+				T_RP + T_RC + T_RC: begin // set register
+					{SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_SetModeReg;
+					SDRAM_A[10:0] <= MODE_REG;
+				end
+				
+				T_RP + T_RC + T_RC + T_MRD: begin // all done !
+					state <= IDLE;
+					busy <= 1'b0;
+				end
+			endcase
+		end
+		
+		IDLE: begin
+			if (rd | wr) begin
+				// bank activate
+				{SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_BankActivate;
+				
+				SDRAM_BA <= addr[ROW_WIDTH + COL_WIDTH + BANK_WIDTH - 1 + addr_offs : ROW_WIDTH + COL_WIDTH + addr_offs];    // bank id
+				SDRAM_A  <= addr[ROW_WIDTH + COL_WIDTH - 1 + addr_offs : COL_WIDTH + addr_offs];      // 12-bit row address
+				
+				state <= rd ? READ : WRITE;
+				addr_buf <= addr;
+				
+				`ifdef naive_sim
+				sim_mem_read_addr <= addr;
+				`endif
+				
+				if (wr) din_buf <= din;
+				
+				cycle <= 4'd1;
+				busy <= 1'b1;
+			end else if (refresh) begin
+				// auto-refresh
+				// no need for precharge-all b/c all our r/w are done with auto-precharge.
+				{SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_AutoRefresh;
+				state <= REFRESH;
+				cycle <= 4'd1;
+				busy <= 1'b1;
+			end
+		end
+		
+		// read sequence
+        //  cycle  / 0 \___/ 1 \___/ 2 \___/ 3 \___/ 4 \___/ 5 \___
+        //  rd     /       \_______________________________
+        //  cmd            |Active | Read  |  NOP  |  NOP  | _Next_
+        //  DQ                                     |  Dout |
+        //  data_ready ____________________________/       \_______   
+        //  busy   ________/                               \_______
+        //                 `-T_RCD-'------CAS------'
+        READ: begin
+			case (cycle)
+				T_RCD: begin
+					{SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_Read;
+					SDRAM_A[10] <= 1'b1;        // set auto precharge
+					SDRAM_A[9:0] <= {1'b0, addr_buf[COL_WIDTH - 1 + addr_offs : addr_offs]};  // column address
+					SDRAM_DQM <= 4'b0;
+					off <= addr_buf[0];
+					
+					read_count <= read_count + 1;
+				end
+				
+				T_RCD + CAS: begin
+					dout_buf <= next_dout;
+				end
+				
+				T_RCD + CAS + 1: begin
+					data_ready <= 1'b1;
+				end
+				
+				T_RCD + CAS + 2: begin
+					data_ready <= 1'b0;
+					
+					busy <= 0;
+					state <= IDLE;
+				end
+			endcase
+		end
+		
+		// write sequence
+        //  cycle / 0 \___/ 1 \___/ 2 \___/ 3 \___/ 4 \___/ 5 \___
+        //  wr    /       \_______________________________
+        //  cmd           |Active | Write |  NOP  |  NOP  | _Next_
+        //  DQ                    | Din   |
+        //  busy   _______/                               \_______
+        //                `-T_RCD-'-------T_WR+T_RP-------'
+        WRITE: begin
+			case (cycle)
+				T_RCD: begin
+					{SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_Write;
+					SDRAM_A[10] <= 1'b1;        // set auto precharge
+					SDRAM_A[9:0] <= {1'b0, addr_buf[COL_WIDTH - 1 + addr_offs : addr_offs]};  // column address
+					SDRAM_DQM <= addr_buf[0] == 0 ? 4'b1100 : 4'b0011;     // only write the correct word
+					off <= addr_buf[0];
+					dq_out <= {din_buf,din_buf};
+					dq_oen <= 1'b0;                 // DQ output on
+					
+					write_count <= write_count + 1;
+					`ifdef naive_sim
+					sim_mem_write_addr <= addr_buf;
+					sim_mem_write_val <= din_buf;
+					sim_mem_write_enable <= 1;
+					`endif
+				end
+				T_RCD + 1: begin
+					dq_oen <= 1'b1;
+				end
+
+				T_RCD + T_WR + T_RP: begin
+					busy <= 0;
+					state <= IDLE;
+				end
+			endcase
+		end
+			
+		// refresh sequence
+		//  cycle   / 0 \___/ 1 \___/ 2 \___/ 3 \___/ 4 \___/ 5 \___
+		//  refresh /       \_______________________________
+		//  cmd             |Refresh|  NOP  |  NOP  |  NOP  | _Next_
+		//  busy     _______/                               \_______
+		//                  `------------- T_RC ------------'
+		REFRESH: begin
+			if (cycle == T_RC) begin
+				state <= IDLE;
+				busy <= 0;
+			end
+		end
+    endcase
+    
+    /*
+    casex ({state, cycle})
+        {INIT, 8'bxxxxxxxx} : if (cfg_now) begin
             state <= CONFIG;
             cycle <= 0;
         end
 
-        // configuration sequence
-        //  cycle  / 0 \___/ 1 \___/ 2 \___/ ... __/ 6 \___/ ...___/10 \___/11 \___/ 12\___
-        //  cmd            |PC_All |Refresh|       |Refresh|       |  MRD  |       | _next_
-        //                 '-T_RP--`----  T_RC  ---'----  T_RC  ---'------T_MRD----'
-        {CONFIG, 4'd0} : begin
+        
+        {CONFIG, 8'd0} : begin
             // precharge all
             {SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_PreCharge;
             SDRAM_A[10] <= 1'b1;
@@ -242,7 +399,7 @@ always @(posedge clk) begin
             read_count <= read_count + 1;
         end
         {READ, T_RCD+CAS}: begin
-            dout_buf <= dq_in;
+            dout_buf <= next_dout;
         end
         {READ, T_RCD+CAS+4'd1}: begin
             data_ready <= 1'b1;
@@ -296,7 +453,8 @@ always @(posedge clk) begin
             busy <= 0;
         end
     endcase
-
+	*/
+	
     if (~resetn) begin
         busy <= 1'b1;
         dq_oen <= 1'b1;         // turn off DQ output
