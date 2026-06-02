@@ -263,10 +263,11 @@ module sdram
 					end
 					
 					T_RCD + CAS: begin
-						dout_buf <= next_dout;
+						// here be dragons
 					end
 					
 					T_RCD + CAS + 1: begin
+						dout_buf <= next_dout;
 						data_ready <= 1'b1;
 					end
 					
