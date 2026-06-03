@@ -11,7 +11,7 @@ module preprocessing_stage #(parameter integer data_width, parameter gain_format
 		output reg signed [data_width - 1 : 0] sample_out_b,
 		
 		input wire signed [data_width - 1 : 0] input_gain,
-		input wire signed [data_width - 1 : 0] input_gains [1:0],
+		input wire signed [data_width - 1 : 0] input_gains [1:0]
 	);
 
 	reg signed [data_width - 1 : 0] sample_in_r;

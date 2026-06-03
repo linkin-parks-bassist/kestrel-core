@@ -10,7 +10,7 @@ module postprocessing_stage #(parameter integer data_width, parameter gain_forma
 		output reg signed [data_width - 1 : 0] sample_out,
 		
 		input wire signed [data_width - 1 : 0] output_gain,
-		input wire signed [data_width - 1 : 0] output_gains [1:0],
+		input wire signed [data_width - 1 : 0] output_gains [1:0]
 	);
 
 	reg signed [data_width - 1 : 0] samples_in_r  [1:0];
