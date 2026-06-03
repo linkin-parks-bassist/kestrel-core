@@ -25,6 +25,9 @@ module delay_master #(parameter integer data_width,
 		input wire signed [data_width - 1 : 0] write_data,
 		input wire signed [data_width - 1 : 0] read_delay,
 		
+		input wire signed [data_width - 1 : 0] read_depth,
+		input wire signed [data_width - 1 : 0] read_offset,
+		
 		output reg mem_req,
 		output reg mem_req_type,
 		
@@ -173,6 +176,7 @@ module delay_master #(parameter integer data_width,
 	localparam READ_1	 	= 4'd6;
 	localparam READ_2	 	= 4'd7;
 	localparam READ_3	 	= 4'd8;
+	localparam READ_3_5	 	= 4'd13;
 	localparam READ_4	 	= 4'd9;
 	localparam READ_5	 	= 4'd10;
 	localparam READ_6	 	= 4'd11;
@@ -218,9 +222,11 @@ module delay_master #(parameter integer data_width,
 	
 	reg [addr_width - 1 : 0] alloc_addr;
 	
-	wire [addr_width - 1 : 0] delay_addr_delta = delay;
-	wire [addr_width - 1 : 0] delay_addr = (delay_addr_delta > position) ? addr + position - delay_addr_delta + size
-																		 : addr + position - delay_addr_delta;
+	wire signed [addr_width     : 0] delay_addr_delta   = delay + rdo;
+	wire signed [addr_width - 1 : 0] delay_addr_delta_c = (delay_addr_delta < 1) ? 1 : ((delay_addr_delta > size - 1) ? size - 1 : delay_addr_delta);
+	reg  [addr_width - 1 : 0] rdo;
+	wire [addr_width - 1 : 0] delay_addr = (delay_addr_delta_c > position) ? addr + position - delay_addr_delta_c + size
+																		   : addr + position - delay_addr_delta_c;
 		
 	reg [$clog2(n_buffers + 1) - 1 : 0] n_buffers_allocd;
 	
@@ -239,9 +245,10 @@ module delay_master #(parameter integer data_width,
 	reg        [data_width - 1 : 0] read_handle_r;
 
 	reg signed [data_width - 1 : 0] mul_a;
+	reg signed [data_width - 1 : 0] mul_b;
 	
-	wire signed [2 * data_width - 1 : 0] product = $signed(mul_a) * $signed(gain);
-	reg  signed [2 * data_width - 1 : 0] product_r;
+	wire signed [2 * data_width - 1 : 0] product_a = $signed(mul_a) * $signed(mul_b);
+	reg  signed [2 * data_width - 1 : 0] product_a_r;
 	
 	wire [addr_width  - 1 : 0] alloc_size_wm  = alloc_size_r [addr_width  - 1 : 0];
 	wire [delay_width - 1 : 0] alloc_delay_wm = alloc_delay_r[delay_width - 1 : 0];
@@ -260,6 +267,8 @@ module delay_master #(parameter integer data_width,
 	wire write_req_posedge = write_req & ~write_req_prev;
 	reg  write_req_posedge_latched;
 	wire write_req_pending = write_req | write_req_posedge_latched;
+	
+	
 	
 	always @(posedge clk) begin
 		write_ack <= 0;
@@ -327,7 +336,7 @@ module delay_master #(parameter integer data_width,
 			write_handle_r <= 0;
 			read_handle_r <= 0;
 			mul_a <= 0;
-			product_r <= 0;
+			product_a_r <= 0;
 			wait_one <= 0;
 			read_wait_one <= 0;
 			write_wait_one <= 0;
@@ -363,11 +372,16 @@ module delay_master #(parameter integer data_width,
 						read_handle_r <= read_handle;
 						buf_info_read_handle <= read_handle;
 						invalid_read <= !buffer_initd[read_handle];
+						
 						req_delay_offset <= read_delay;
+						
+						mul_a <= read_depth < 1 ? 0 : read_depth;
+						mul_b <= read_offset;
 						
 						read_req_posedge_latched <= 0;
 						
 						state <= buffer_initd[read_handle] ? READ_1 : IDLE;
+						
 					end else if (write_req_pending) begin
 						write_data_r <= write_data;
 						write_handle_r <= write_handle;
@@ -383,6 +397,8 @@ module delay_master #(parameter integer data_width,
 				
 				READ_1: begin
 					state <= READ_2;
+					
+					product_a_r <= product_a;
 				end
 				
 				READ_2: begin
@@ -391,12 +407,21 @@ module delay_master #(parameter integer data_width,
 				end
 				
 				READ_3: begin
+					mul_a <= product_a_r >>> (data_width - 1);
+					mul_b <= size[delay_width - 1 -: data_width];
+					
                     /*if ($signed(delay) + req_delay_offset < 1)
                         delay <= 1;
                     else if (delay + req_delay_offset > (size - 1))
                         delay <= size - 1;
                     else
                         delay <= $unsigned($signed(delay) + req_delay_offset);*/
+					state <= READ_3_5;
+				end
+				
+				READ_3_5: begin
+					rdo <= product_a >>> (data_width - 1 - (delay_width - data_width));
+					
 					state <= READ_4;
 				end
 				
@@ -413,6 +438,7 @@ module delay_master #(parameter integer data_width,
 				READ_5: begin
 					if (mem_read_valid) begin
                         mul_a           <= mem_data_in;
+                        mul_b           <= gain;
 						state 			<= READ_6;
                         wait_one        <= 1;
 					end
@@ -420,14 +446,14 @@ module delay_master #(parameter integer data_width,
 
                 READ_6: begin
                     if (~wait_one) begin
-                        product_r <= product;
+                        product_a_r <= product_a;
                         state <= READ_7;
                     end
                 end
                 
 				
 				READ_7: begin
-					data_out 	<= product_r >>> (data_width - 2);
+					data_out 	<= product_a_r >>> (data_width - 2);
 					read_valid  <= 1;
 					state 		<= IDLE;
 				end

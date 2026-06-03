@@ -54,6 +54,8 @@ module dsp_core #(
 		output wire signed [data_width - 1 : 0] delay_write_inc,
 		input  wire signed [data_width - 1 : 0] delay_read_data,
 		output wire 	   [data_width - 1 : 0] delay_read_delay,
+		output wire 	   [data_width - 1 : 0] delay_read_depth,
+		output wire 	   [data_width - 1 : 0] delay_read_offset,
 		input  wire delay_read_valid,
 		input  wire delay_write_ack,
 		
@@ -744,9 +746,12 @@ module dsp_core #(
 		.commit_flag_out(commit_flag_final_stages[`INSTR_BRANCH_MISC])
 	);
 
-	wire [data_width - 1 : 0] delay_arg;
-	assign delay_write_data = delay_arg;
-	assign delay_read_delay = delay_arg;
+	wire  [data_width - 1 : 0] delay_arg_1;
+	wire  [data_width - 1 : 0] delay_arg_2;
+	assign delay_write_data  = delay_arg_1;
+	assign delay_read_delay  = delay_arg_1;
+	assign delay_read_depth  = delay_arg_1;
+	assign delay_read_offset = delay_arg_2;
 
 	/**********/
 	/* Delays */
@@ -772,10 +777,10 @@ module dsp_core #(
 		.handle_out(delay_req_handle),
 		
 		.arg_a_in(arg_a_out_router),
-		.arg_a_out(delay_arg),
+		.arg_a_out(delay_arg_1),
 		
 		.arg_b_in(arg_b_out_router),
-		.arg_b_out(),
+		.arg_b_out(delay_arg_2),
 		
 		.dest_in(dest_out_router),
 		.dest_out(dest_final_stages[`INSTR_BRANCH_DELAY]),

@@ -351,7 +351,8 @@ module top
 		end   
 	end
 	
-	`define USE_BRAM_INSTEAD
+	//`define USE_BRAM_INSTEAD
+	
 	`ifdef USE_BRAM_INSTEAD
 	localparam sdram_size = (1024 * 14);
 	localparam sdram_addr_width = $clog2(sdram_size);
@@ -406,12 +407,12 @@ module top
 			.COL_WIDTH(8),
 			.BANK_WIDTH(2),  
 
-			.CAS(4'd3),     
-			.T_WR(4'd4),
-			.T_MRD(4'd4),
-			.T_RP(4'd3),
-			.T_RCD(4'd3),
-			.T_RC(4'd8)
+			.CAS  (2),     
+			.T_WR (2),
+			.T_MRD(2),
+			.T_RP (1),
+			.T_RCD(1),
+			.T_RC (4)
 		)
 		sdram_controller
 		(

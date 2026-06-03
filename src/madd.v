@@ -2,6 +2,51 @@
 
 `default_nettype none
 
+module q1_mul #(parameter integer data_width)
+	(
+		input wire clk,
+		input wire reset,
+		
+		input wire in_valid,
+		output reg out_valid,
+		
+		input wire signed [data_width - 1 : 0] a,
+		input wire signed [data_width - 1 : 0] b,
+		
+		output reg [data_width - 1 : 0] out
+	);
+	
+	reg in_valid_r;
+	reg in_valid_r2;
+	
+	wire signed [2 * data_width - 1 : 0] prod = a * b;
+	
+	reg  signed [2 * data_width - 1 : 0] prod_r;
+	reg  signed [2 * data_width - 1 : 0] prod_r_sat;
+	reg  signed [    data_width - 1 : 0] prod_r_sat_sh;
+	
+	assign out = prod_r_sat_sh;
+	
+	localparam signed [2 * data_width - 1 : 0] sat_max = ( 1 << (data_width - 1)) - 1;
+	localparam signed [2 * data_width - 1 : 0] sat_min = (-1 << (data_width - 1));
+	
+	always @(posedge clk) begin
+		prod_r <= prod;
+		prod_r_sat <= prod_r > sat_max ? sat_max : ((prod_r < sat_min) ? sat_min : prod_r);
+		prod_r_sat_sh <= prod_r_sat >>> (data_width - 1);
+		
+		if (reset) begin
+			in_valid_r 	<= 0;
+			in_valid_r2 <= 0;
+			out_valid 	<= 0;
+		end else begin
+			in_valid_r 	<= in_valid;
+			in_valid_r2 <= in_valid_r;
+			out_valid 	<= in_valid_r2;
+		end
+	end
+endmodule
+
 module multiply_stage #(parameter integer data_width, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16)
 	(
 		input wire clk,
