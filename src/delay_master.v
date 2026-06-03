@@ -177,6 +177,7 @@ module delay_master #(parameter integer data_width,
 	localparam READ_2	 	= 4'd7;
 	localparam READ_3	 	= 4'd8;
 	localparam READ_3_5	 	= 4'd13;
+	localparam READ_3_75	= 4'd14;
 	localparam READ_4	 	= 4'd9;
 	localparam READ_5	 	= 4'd10;
 	localparam READ_6	 	= 4'd11;
@@ -222,8 +223,8 @@ module delay_master #(parameter integer data_width,
 	
 	reg [addr_width - 1 : 0] alloc_addr;
 	
-	wire signed [addr_width     : 0] delay_addr_delta   = delay + rdo;
-	wire signed [addr_width - 1 : 0] delay_addr_delta_c = (delay_addr_delta < 1) ? 1 : ((delay_addr_delta > size - 1) ? size - 1 : delay_addr_delta);
+	wire signed [addr_width - 1 : 0] delay_addr_delta   = delay + rdo;
+	reg  signed [addr_width - 1 : 0] delay_addr_delta_c;
 	reg  [addr_width - 1 : 0] rdo;
 	wire [addr_width - 1 : 0] delay_addr = (delay_addr_delta_c > position) ? addr + position - delay_addr_delta_c + size
 																		   : addr + position - delay_addr_delta_c;
@@ -421,6 +422,16 @@ module delay_master #(parameter integer data_width,
 				
 				READ_3_5: begin
 					rdo <= product_a >>> (data_width - 1 - (delay_width - data_width));
+					state <= READ_3_75;
+				end
+				
+				READ_3_75: begin
+					if (delay_addr_delta < -$signed(size) + 1)
+						delay_addr_delta_c <= -$signed(size) + 1;
+					else if (delay_addr_delta > size - 1)
+						delay_addr_delta_c <= size - 1;
+					else
+						delay_addr_delta_c <= delay_addr_delta;
 					
 					state <= READ_4;
 				end
