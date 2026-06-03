@@ -113,14 +113,11 @@ module dsp_core #(
 	wire [31 : 0] command_instr_write_val;
 	wire signed [data_width - 1 : 0] command_reg_write_val;
 	
-	
 	assign command_instr_write_val = ctrl_data_in[31 : 0];
 	assign command_block_target =  (command_instr_write) ? ctrl_data_in[$clog2(n_blocks) + 32 - 1 : 32]
 														 : ctrl_data_in[$clog2(n_blocks) + data_width - 1 : data_width];
-	
 	assign command_reg_write_val = ctrl_data_in[data_width - 1 : 0];
 	assign command_reg_target  	 = command_reg_1_write;
-	
 	
 	reg enable_req_r;
 	reg enable_core;
@@ -238,6 +235,7 @@ module dsp_core #(
 				data_req_active <= 1;
 			end else if (data_req_active) begin
 				case (data_req_type)
+`ifdef DEBUG_READS
 					`DATA_REQ_N_BLOCKS: begin
 						data_return <= n_blocks_running;
 						data_return_valid <= 1;
@@ -270,7 +268,8 @@ module dsp_core #(
 						data_return <= stuck_flags;
 						data_return_valid <= 1;
 						data_req_active <= 0;
-					end
+					end	
+`endif
 					
 					`DATA_REQ_MEM: begin
 						if (mem_write_enable && mem_write_addr == mem_data_req_addr) begin

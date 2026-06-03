@@ -112,7 +112,6 @@ module dsp_pipeline #(
 		.delay_req_handle (delay_req_handle),
 		.delay_write_data (delay_write_data),
 		.delay_read_data  (delay_read_data),
-		.delay_read_delay (delay_read_delay),
 		.delay_read_depth (delay_read_depth),
 		.delay_read_offset(delay_read_offset),
 		.delay_read_valid (delay_read_valid),
@@ -199,7 +198,6 @@ module dsp_pipeline #(
 	localparam delay_mem_addr_width = sdram_addr_width;
 	localparam delay_mem_size = (1 << (delay_mem_addr_width));
 
-    wire [data_width - 1 : 0] delay_read_delay;
     wire any_delay_buffers;
     
     wire stuck_delay;
@@ -221,7 +219,6 @@ module dsp_pipeline #(
 		
 		.write_handle(delay_req_handle),
 		.read_handle (delay_req_handle),
-		.read_delay	 (delay_read_delay),
 		.read_depth	 (delay_read_depth),
 		.read_offset (delay_read_offset),
 		.write_data  (delay_write_data),
@@ -243,14 +240,17 @@ module dsp_pipeline #(
 		.mem_write_ack (sdram_write_ack),
 
         .any_buffers(any_delay_buffers),
-
-        .ctrl_data_in(ctrl_data_in),
+        
+        `ifdef DEBUG_READS
         
         .data_req(data_req_delay),
         .data_return(data_return_delay),
         .data_return_valid(data_return_valid_delay),
         
-        .stuck(stuck_delay)
+        .stuck(stuck_delay),
+        `endif
+
+        .ctrl_data_in(ctrl_data_in)
 	);
 	
 	wire filter_calc_req;
