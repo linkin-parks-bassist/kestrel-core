@@ -267,18 +267,12 @@ module delay_master #(parameter integer data_width,
 				end
 				
 				READ_2: begin
-					if (wrapped_f) begin
-						{addr, size, delay, position, gain, wrapped} <= buf_info_read;
+					{addr, size, delay, position, gain, wrapped} <= buf_info_read;
 					
-						mul_a <= product_a_r >>> (data_width - 1);
-						mul_b <= size_f[addr_width - 1 -: data_width];
-						
-						state <= READ_3;
-					end else begin
-						data_out 	<= 0;
-						read_valid 	<= 1;
-						state 		<= IDLE;
-					end
+					mul_a <= product_a_r >>> (data_width - 1);
+					mul_b <= size_f[addr_width - 1 -: data_width];
+					
+					state <= READ_3;
 				end
 				
 				READ_3: begin
@@ -311,15 +305,9 @@ module delay_master #(parameter integer data_width,
 				
 				READ_6: begin
 					if (mem_read_valid) begin
-						if (gain == unity_gain) begin
-							data_out 	<= mem_data_in;
-							read_valid  <= 1;
-							state 		<= IDLE;
-						end else begin
-							mul_a           <= mem_data_in;
-							mul_b           <= gain;
-							state 			<= READ_7;
-						end
+						mul_a           <= mem_data_in;
+						mul_b           <= gain;
+						state 			<= READ_7;
 					end
 				end
 				
