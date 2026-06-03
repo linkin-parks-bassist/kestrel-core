@@ -35,7 +35,7 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 		output reg signed [data_width - 1 : 0] output_gain,
 		output reg signed [data_width - 1 : 0] output_gains [1:0],
 		
-		input reg signed  [data_width - 1 : 0] out_samples [1:0],
+		input wire signed  [data_width - 1 : 0] out_samples [1:0],
 		
 		input wire swap_pipelines,
 		input wire swap_tail_enable,
@@ -63,14 +63,20 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 	wire signed [data_width - 1 : 0] envelopes [1:0];
 	wire envelope_valids [1:0];
 	
+	reg signed [data_width - 1 : 0] envelope_a_r;
+	reg signed [data_width - 1 : 0] envelope_b_r;
+	
+	reg signed [data_width - 1 : 0] envelopes_r;
+	
+	assign envelopes_r[0] = envelope_a_r;
+	assign envelopes_r[1] = envelope_b_r;
+	
 	envelope_follower #(.data_width(data_width)) env_a
 		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_samples[0]), .sample_valid(tick), .envelope(envelopes[0]), .envelope_valid(envelope_valids[0]));
 	envelope_follower #(.data_width(data_width)) env_b
 		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_samples[1]), .sample_valid(tick), .envelope(envelopes[1]), .envelope_valid(envelope_valids[1]));
 	
 	always @(posedge clk) begin
-	
-		current_pipeline_r <= current_pipeline;
 	
 		if (set_input_gain)   input_gain <= data_in;
 		if (set_output_gain) output_gain <= data_in;
@@ -82,6 +88,9 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 			swap_tail_enable_state <= TAIL_SWAP_RAMP;
 			swap_tail_enable_ctr <= 0;
 		end
+		
+		if (envelope_valids[0])	envelope_a_r <= envelopes[0];
+		if (envelope_valids[1])	envelope_b_r <= envelopes[1];
 		
 		if (reset) begin
 			input_gain     <= 0;
@@ -95,6 +104,9 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 			pipelines_swapping <= 0;
 			swap_tail_enable_r <= 0;
 		end else if (tick) begin
+			
+			current_pipeline_r <= current_pipeline;
+			
 			if (pipelines_swapping) begin
 				if (swap_tail_enable_r) begin
 					case (swap_tail_enable_state)
@@ -117,7 +129,7 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 								if (swap_tail_enable_ctr[5:0] == 6'b0)
 									output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - 1;
 								
-								if (envelopes[current_pipeline_r] < tail_envelope_threshold) begin
+								if (envelopes_r[current_pipeline_r] < tail_envelope_threshold) begin
 									swap_tail_enable_state <= TAIL_SWAP_CLOSE;
 								end
 							end

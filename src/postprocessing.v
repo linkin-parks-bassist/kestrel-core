@@ -19,7 +19,11 @@ module postprocessing_stage #(parameter integer data_width, parameter gain_forma
 	reg in_valid_1;
 	reg in_valid_gain;
 
-	bimultiplier #(.data_width(data_width), .format(gain_format)) input_gain_applier
+	reg signed [data_width - 1 : 0] output_gain_r;
+	reg signed [data_width - 1 : 0] output_gain_a_r;
+	reg signed [data_width - 1 : 0] output_gain_b_r;
+
+	bimultiplier #(.data_width(data_width), .format(gain_format)) output_gain_applier
 		(
 			.clk(clk),
 			.reset(reset),
@@ -27,10 +31,10 @@ module postprocessing_stage #(parameter integer data_width, parameter gain_forma
 			.x(samples_in_pg[0]),
 			.y(samples_in_pg[1]),
 
-			.a(output_gain),
-			.b(output_gain),
-			.c(output_gains[0]),
-			.d(output_gains[1]),
+			.a(output_gain_r),
+			.b(output_gain_r),
+			.c(output_gain_a_r),
+			.d(output_gain_b_r),
 
 			.in_valid(in_valid_gain),
 
@@ -66,6 +70,10 @@ module postprocessing_stage #(parameter integer data_width, parameter gain_forma
 			if (tick) begin
 				samples_in_r[0] <= samples_in[0];
 				samples_in_r[1] <= samples_in[1];
+				
+				output_gain_r <= output_gain;
+				output_gain_a_r <= output_gains[0];
+				output_gain_b_r <= output_gains[1];
 			end
 		end
 	end

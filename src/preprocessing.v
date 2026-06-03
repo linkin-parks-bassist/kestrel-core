@@ -22,6 +22,10 @@ module preprocessing_stage #(parameter integer data_width, parameter gain_format
 
 	reg in_valid_1;
 	reg in_valid_gain;
+	
+	reg signed [data_width - 1 : 0] input_gain_r;
+	reg signed [data_width - 1 : 0] input_gain_a_r;
+	reg signed [data_width - 1 : 0] input_gain_b_r;
 
 	bimultiplier #(.data_width(data_width), .format(gain_format)) input_gain_applier
 		(
@@ -31,10 +35,10 @@ module preprocessing_stage #(parameter integer data_width, parameter gain_format
 			.x(sample_in_pg),
 			.y(sample_in_pg),
 
-			.a(input_gain),
-			.b(input_gain),
-			.c(input_gains[0]),
-			.d(input_gains[1]),
+			.a(input_gain_r),
+			.b(input_gain_r),
+			.c(input_gain_a_r),
+			.d(input_gain_b_r),
 
 			.in_valid(in_valid_gain),
 
@@ -62,6 +66,10 @@ module preprocessing_stage #(parameter integer data_width, parameter gain_format
 		end else begin
 			if (tick) begin
 				sample_in_r <= sample_in;
+				
+				input_gain_r <= input_gain;
+				input_gain_a_r <= input_gains[0];
+				input_gain_b_r <= input_gains[1];
 			end
 		end
 	end
