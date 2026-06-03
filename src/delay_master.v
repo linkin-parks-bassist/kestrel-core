@@ -276,7 +276,7 @@ module delay_master #(parameter integer data_width,
 				end
 				
 				READ_3: begin
-					delay_addr_delta <= delay + product_a >>> (data_width - 1 - (addr_width - data_width));
+					delay_addr_delta <= delay + (product_a >>> (data_width - 1 - (addr_width - data_width)));
 					state <= READ_4;
 				end
 				
@@ -305,9 +305,9 @@ module delay_master #(parameter integer data_width,
 				
 				READ_6: begin
 					if (mem_read_valid) begin
-						mul_a           <= mem_data_in;
-						mul_b           <= gain;
-						state 			<= READ_7;
+						mul_a <= mem_data_in;
+						mul_b <= gain;
+						state <= READ_7;
 					end
 				end
 				
