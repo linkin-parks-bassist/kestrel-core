@@ -18,7 +18,7 @@
 
 `default_nettype none
 
-module gain_controller #(parameter integer data_width, parameter shift = 5)
+module gain_controller #(parameter integer data_width, parameter gain_format = 5)
 	(
 		input wire clk,
 		input wire reset,
@@ -35,7 +35,7 @@ module gain_controller #(parameter integer data_width, parameter shift = 5)
 		output reg signed [data_width - 1 : 0] output_gain,
 		output reg signed [data_width - 1 : 0] output_gains [1:0],
 		
-		input reg signed  [data_width - 1 : 0] envelopes [1:0],
+		input reg signed  [data_width - 1 : 0] out_samples [1:0],
 		
 		input wire swap_pipelines,
 		input wire swap_tail_enable,
@@ -45,7 +45,7 @@ module gain_controller #(parameter integer data_width, parameter shift = 5)
 		input wire current_pipeline
 	);
 	
-	localparam signed [data_width - 1 : 0] unity_gain 				= 1 << (data_width - 1 - shift);
+	localparam signed [data_width - 1 : 0] unity_gain 				= 1 << (data_width - 1 - gain_format);
 	localparam signed [data_width - 1 : 0] switch_velocity 			= unity_gain >> 8;
 	localparam signed [data_width - 1 : 0] tail_close_velocity 		= unity_gain >> 9;
 	localparam signed [data_width - 1 : 0] tail_envelope_threshold 	= 1 << 4;
@@ -59,6 +59,14 @@ module gain_controller #(parameter integer data_width, parameter shift = 5)
 	reg [63:0] swap_tail_enable_ctr;
 	
 	reg current_pipeline_r;
+	
+	wire signed [data_width - 1 : 0] envelopes [1:0];
+	wire envelope_valids [1:0];
+	
+	envelope_follower #(.data_width(data_width)) env_a
+		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_samples[0]), .sample_valid(tick), .envelope(envelopes[0]), .envelope_valid(envelope_valids[0]));
+	envelope_follower #(.data_width(data_width)) env_b
+		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_samples[1]), .sample_valid(tick), .envelope(envelopes[1]), .envelope_valid(envelope_valids[1]));
 	
 	always @(posedge clk) begin
 	
@@ -126,7 +134,7 @@ module gain_controller #(parameter integer data_width, parameter shift = 5)
 						end
 					endcase
 				end else begin
-					if (output_gains[current_pipeline_r] == 0) begin
+					if (output_gains[ current_pipeline_r] == 0) begin
 						output_gains[~current_pipeline_r] <= unity_gain;
 						pipelines_swapping <= 0;
 					end
@@ -140,7 +148,7 @@ module gain_controller #(parameter integer data_width, parameter shift = 5)
 	end
 endmodule
 
-module bimultiplier #(parameter integer data_width, parameter shift = 0)
+module bimultiplier #(parameter integer data_width, parameter format = 0)
 	(
 		input wire clk,
 		input wire reset,
@@ -190,10 +198,10 @@ module bimultiplier #(parameter integer data_width, parameter shift = 0)
 	
 	always @(posedge clk) begin
 		prod_1 		  <= factor_1 * coef_1;
-		prod_1_sh 	  <= prod_1 >>> (data_width - 1 - shift);
+		prod_1_sh 	  <= prod_1 >>> (data_width - 1 - format);
 		prod_1_sh_sat <= (prod_1_sh > sat_max) ? sat_max : ((prod_1_sh < sat_min) ? sat_min : prod_1_sh);
 		prod_2 		  <= factor_2 * coef_2;
-		prod_2_sh 	  <= prod_2 >>> (data_width - 1 - shift);
+		prod_2_sh 	  <= prod_2 >>> (data_width - 1 - format);
 		prod_2_sh_sat <= (prod_2_sh > sat_max) ? sat_max : ((prod_2_sh < sat_min) ? sat_min : prod_2_sh);
 		
 		out_valid <= 0;
@@ -232,7 +240,7 @@ module bimultiplier #(parameter integer data_width, parameter shift = 0)
 	
 endmodule
 
-module mixer #(parameter integer data_width, parameter shift = 4)
+module mixer #(parameter integer data_width, parameter gain_format = 4)
 	(
 		input wire clk,
 		input wire reset,
@@ -264,23 +272,17 @@ module mixer #(parameter integer data_width, parameter shift = 4)
 		input  wire current_pipeline
 	);
 	
-	wire [data_width - 1 : 0] envelope_a;
-	wire [data_width - 1 : 0] envelope_b;
-	wire envelope_a_valid;
-	wire envelope_b_valid;
-	
-	envelope_follower #(.data_width(data_width)) env_a
-		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_sample_in_a), .sample_valid(out_samples_valid), .envelope(envelope_a), .envelope_valid(envelope_a_valid));
-	envelope_follower #(.data_width(data_width)) env_b
-		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_sample_in_b), .sample_valid(out_samples_valid), .envelope(envelope_b), .envelope_valid(envelope_b_valid));
-	
 	wire signed [data_width - 1 : 0] input_gain;
 	wire signed [data_width - 1 : 0] input_gains [1:0];
 	
 	wire signed [data_width - 1 : 0] output_gain;
 	wire signed [data_width - 1 : 0] output_gains [1:0];
 	
-	gain_controller #(.data_width(data_width), .shift(shift)) gain_ctrl
+	wire signed [data_width - 1 : 0] out_samples_in [1:0];
+	assign out_samples_in[0] = out_sample_in_a;
+	assign out_samples_in[1] = out_sample_in_b;
+	
+	gain_controller #(.data_width(data_width), .gain_format(gain_format)) gain_ctrl
 		(
 			.clk(clk),
 			.reset(reset),
@@ -297,7 +299,7 @@ module mixer #(parameter integer data_width, parameter shift = 4)
 			.output_gain(output_gain),
 			.output_gains(output_gains),
 			
-			.envelopes({envelope_b, envelope_a}),
+			.out_samples(out_samples_in),
 			
 			.swap_pipelines(swap_pipelines),
 			.swap_tail_enable(swap_tail_enable),
@@ -309,7 +311,7 @@ module mixer #(parameter integer data_width, parameter shift = 4)
 	
 	wire output_gain_valid;
 	
-	bimultiplier #(.data_width(data_width), .shift(shift)) input_gain_applier
+	bimultiplier #(.data_width(data_width), .format(gain_format)) input_gain_applier
 		(
 			.clk(clk),
 			.reset(reset),
@@ -333,7 +335,7 @@ module mixer #(parameter integer data_width, parameter shift = 4)
 	wire signed [data_width - 1 : 0] out_sample_a_amp;
 	wire signed [data_width - 1 : 0] out_sample_b_amp;
 	
-	bimultiplier #(.data_width(data_width), .shift(shift)) output_gain_applier
+	bimultiplier #(.data_width(data_width), .format(gain_format)) output_gain_applier
 		(
 			.clk(clk),
 			.reset(reset),

@@ -3,8 +3,9 @@
 `default_nettype none
 
 module delay_master #(parameter integer data_width,
-					  parameter n_buffers   = 32,
-					  parameter addr_width  = 20)
+					  parameter handle_width = `HANDLE_WIDTH,
+					  parameter n_buffers    = `N_DELAYS,
+					  parameter addr_width   = 20)
 	(
 		input wire clk,
 		input wire reset,
@@ -69,7 +70,6 @@ module delay_master #(parameter integer data_width,
     end
 
 	localparam memory_size  = (1 << addr_width);
-	localparam handle_width = $clog2(n_buffers);
 	
 	assign any_buffers = |n_buffers_allocd;
 	

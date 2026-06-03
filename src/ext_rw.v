@@ -1,4 +1,5 @@
 `include "instr_dec.vh"
+`include "filter.vh"
 `include "defs.vh"
 `include "lut.vh"
 `include "core.vh"

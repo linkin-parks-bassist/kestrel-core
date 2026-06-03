@@ -73,7 +73,7 @@
 `define BLOCK_PMS_WIDTH			5
 `define BLOCK_RES_ADDR_WIDTH	8
 
-`define SHIFT_WIDTH   		5
+`define SHIFT_WIDTH   			5
 
 `define ZERO_REGISTER_ADDR 		4'd2
 `define POS_ONE_REGISTER_ADDR  	4'd3

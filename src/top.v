@@ -71,7 +71,6 @@ module top
 
 		.current_pipeline(current_pipeline),
 		
-		.out(out),
 		.spi_byte_out(spi_byte_out),
 
 		.sdram_read(sdram_read),
@@ -88,7 +87,6 @@ module top
 		.sdram_write_count(sdram_write_count)
 	);
 	
-	wire [7:0] out;
 	wire [7:0] spi_byte_out;
 	
 	wire current_pipeline;

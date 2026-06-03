@@ -1,3 +1,4 @@
+`include "filter.vh"
 `include "defs.vh"
 
 module filter_master #(parameter integer data_width, parameter integer math_width, parameter n_filters = 128, parameter mem_size = 2048)

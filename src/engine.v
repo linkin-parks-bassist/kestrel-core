@@ -22,13 +22,9 @@ module dsp_engine #(
 		input  wire command_in_valid,
 		output wire invalid_command,
 		
-		output reg ready,
-		
 		output wire [$clog2(spi_fifo_length) : 0] fifo_count,
 
 		output wire current_pipeline,
-
-		output wire [7:0] out,
 		
 		output wire [7:0] spi_byte_out,
 		
@@ -46,13 +42,63 @@ module dsp_engine #(
 		input wire [63:0] sdram_write_count
 	);
 
-	assign out = control_state;
+	wire signed [data_width - 1 : 0] input_gain;
+	wire signed [data_width - 1 : 0] input_gains [1:0];
+	
+	wire signed [data_width - 1 : 0] output_gain;
+	wire signed [data_width - 1 : 0] output_gains [1:0];
+	
+	gain_controller #(.data_width(data_width), .gain_format(`GAIN_FORMAT)) gain_ctrl
+		(
+			.clk(clk),
+			.reset(reset),
 
+			.tick(sample_valid),
+
+			.set_input_gain(set_input_gain),
+			.set_output_gain(set_output_gain),
+			.data_in(ctrl_data_out),
+			
+			.input_gain(input_gain),
+			.input_gains(input_gains),
+			
+			.output_gain(output_gain),
+			.output_gains(output_gains),
+			
+			.out_samples(out_samples),
+			
+			.swap_pipelines(swap_pipelines),
+			.swap_tail_enable(swap_tail_enable),
+			
+			.pipelines_swapping(pipelines_swapping),
+			
+			.current_pipeline(current_pipeline)
+		);
+	
 	/*******/
 	/*******/
 	/* DSP */
 	/*******/
 	/*******/
+	
+	wire signed [data_width - 1 : 0] sample_preproc_a;
+	wire signed [data_width - 1 : 0] sample_preproc_b;
+	
+	preprocessing_stage #(.data_width(data_width), .gain_format(`GAIN_FORMAT)) preproc
+	(
+		.clk(clk),
+		.reset(reset),
+		
+		.tick(sample_valid),
+		
+		.sample_in(in_sample),
+		
+		.sample_out_a(sample_preproc_a),
+		.sample_out_b(sample_preproc_b),
+		
+		.input_gain(input_gain),
+		.input_gains(input_gains)
+	);
 
 	/***************************************************************************/
 	/* Dual DSP piplines for atomic, artifact-free runtime DSP reconfiguration */
@@ -62,11 +108,11 @@ module dsp_engine #(
 		.clk(clk),
 		.reset(reset | pipeline_a_reset),
 		
-		.in_sample(in_samples[0]),
-		.in_valid(pipeline_tick),
+		.in_valid(sample_valid),
+		
+		.in_sample(sample_preproc_a),
 		.out_sample(out_samples[0]),
 		
-		.ready(pipeline_a_ready),
 		.error(pipeline_a_error),
 
 		.instr_write(pipeline_a_block_instr_write),
@@ -114,11 +160,11 @@ module dsp_engine #(
 		.clk(clk),
 		.reset(reset | pipeline_b_reset),
 		
-		.in_sample(in_samples[1]),
-		.in_valid(pipeline_tick),
+		.in_valid(sample_valid),
+		
+		.in_sample(sample_preproc_b),
 		.out_sample(out_samples[1]),
 		
-		.ready(pipeline_b_ready),
 		.error(pipeline_b_error),
 
 		.instr_write(pipeline_b_block_instr_write),
@@ -162,40 +208,25 @@ module dsp_engine #(
         .ctrl_data_in(ctrl_data)
 	);
 	
-	/**********************************************************/
-	/* Mixer; applies input/output gain, crossfades pipelines */
-	/**********************************************************/
+	wire signed [data_width - 1 : 0] sample_out_processed;
 	
-	mixer #(.data_width(data_width), .shift(5)) mixerr (
+	postprocessing_stage #(.data_width(data_width), .gain_format(`GAIN_FORMAT)) postproc
+	(
 		.clk(clk),
 		.reset(reset),
 		
-		.in_sample(in_sample_latched),
+		.tick(sample_valid),
 		
-		.in_sample_out_a(in_samples[0]),
-		.in_sample_out_b(in_samples[1]),
+		.samples_in(out_samples),
 		
-		.out_sample_in_a(out_samples_a),
-		.out_sample_in_b(out_samples_b),
+		.sample_out(sample_out_processed),
 		
-		.out_sample(out_sample_mixed),
-		
-		.data_in(ctrl_data_out),
-		
-		.in_sample_valid(apply_input_gain),
-		.out_samples_valid(mix_outputs),
-		
-		.in_sample_mixed(in_sample_valid),
-		.out_sample_valid(out_sample_valid),
-		
-		.set_input_gain(set_input_gain),
-		.set_output_gain(set_output_gain),
-		
-		.swap_pipelines(swap_pipelines),
-		.swap_tail_enable(swap_tail_enable),
-		.pipelines_swapping(pipelines_swapping),
-		.current_pipeline(current_pipeline)
+		.output_gain(output_gain),
+		.output_gains(output_gains)
 	);
+	
+	always @(posedge clk)
+		out_sample <= sample_out_processed;
 	
 	/********************************************************/
 	/* Health monitor; reports busted configs/DSP disasters */
@@ -402,64 +433,11 @@ module dsp_engine #(
 			.controller_busy(sdram_busy)
 		);
 	
-	/*******/
-	/* FSM */
-	/*******/
-	
-	reg signed [data_width - 1 : 0] out_samples_a;
-	reg signed [data_width - 1 : 0] out_samples_b;
-	
-	always @(posedge clk) begin
-		pipeline_tick 		<= 0;
-		
-		apply_input_gain 	<= 0;
-		mix_outputs			<= 0;
-		
-		case (state)
-			`ENGINE_STATE_READY: begin
-				if (sample_valid) begin
-					in_sample_latched <= in_sample;
-					apply_input_gain <= 1;
-					ready <= 0;
-					
-					out_samples_a <= pipeline_a_ready ? out_samples[0] : 0;
-					out_samples_b <= pipeline_b_ready ? out_samples[1] : 0;
-				end
-				
-				if (in_sample_valid) begin
-					mix_outputs <= 1;
-					
-					sample_ctr <= sample_ctr + 1;
-					pipeline_tick <= 1;	
-					
-					ready <= 0;
-					state <= `ENGINE_STATE_MIXING;
-				end
-			end
-			
-			`ENGINE_STATE_MIXING: begin
-				if (out_sample_valid) begin
-					out_sample <= out_sample_mixed;
-					ready <= 1;
-					state <= `ENGINE_STATE_READY;
-				end
-			end
-		endcase
-	end
-	
 	/**********/
 	/* Wiring */
 	/**********/
 	
-	reg  signed [data_width - 1 : 0]  in_sample_latched;
-	wire signed [data_width - 1 : 0]  in_samples [1:0];
 	wire signed [data_width - 1 : 0] out_samples [1:0];
-	wire signed [data_width - 1 : 0] out_sample_mixed;
-
-	wire in_valid;
-
-	wire pipeline_a_ready;
-	wire pipeline_b_ready;
 
 	wire pipeline_a_error;
 	wire pipeline_b_error;
@@ -476,8 +454,6 @@ module dsp_engine #(
 	wire [1:0] pipeline_enables;
 	wire [1:0] pipeline_resetting;
 	wire [1:0] pipeline_regfiles_syncing;
-
-	reg pipeline_tick = 0;
 
 	wire [$clog2(n_blocks) - 1 : 0] block_target;
 	wire reg_target;
