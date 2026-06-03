@@ -49,7 +49,7 @@ module dsp_engine #(
 	wire signed [data_width - 1 : 0] output_gains [1:0];
 	
 	reg tick;
-	wire signed [data_width - 1 : 0] in_sample_r;
+	reg signed [data_width - 1 : 0] in_sample_r;
 	
 	always @(posedge clk) begin
 		tick <= 0;
