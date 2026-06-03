@@ -48,12 +48,28 @@ module dsp_engine #(
 	wire signed [data_width - 1 : 0] output_gain;
 	wire signed [data_width - 1 : 0] output_gains [1:0];
 	
+	reg tick;
+	wire signed [data_width - 1 : 0] in_sample_r;
+	
+	always @(posedge clk) begin
+		tick <= 0;
+		
+		if (sample_valid) begin
+			in_sample_r <= in_sample;
+			tick <= 1;
+		end
+		
+		if (tick) begin
+			out_sample <= sample_out_processed;
+		end
+	end
+	
 	gain_controller #(.data_width(data_width), .gain_format(`GAIN_FORMAT)) gain_ctrl
 		(
 			.clk(clk),
 			.reset(reset),
 
-			.tick(sample_valid),
+			.tick(tick),
 
 			.set_input_gain(set_input_gain),
 			.set_output_gain(set_output_gain),
@@ -89,7 +105,7 @@ module dsp_engine #(
 		.clk(clk),
 		.reset(reset),
 		
-		.tick(sample_valid),
+		.tick(tick),
 		
 		.sample_in(in_sample),
 		
@@ -108,7 +124,7 @@ module dsp_engine #(
 		.clk(clk),
 		.reset(reset | pipeline_a_reset),
 		
-		.in_valid(sample_valid),
+		.in_valid(tick),
 		
 		.in_sample(sample_preproc_a),
 		.out_sample(out_samples[0]),
@@ -160,7 +176,7 @@ module dsp_engine #(
 		.clk(clk),
 		.reset(reset | pipeline_b_reset),
 		
-		.in_valid(sample_valid),
+		.in_valid(tick),
 		
 		.in_sample(sample_preproc_b),
 		.out_sample(out_samples[1]),
@@ -215,7 +231,7 @@ module dsp_engine #(
 		.clk(clk),
 		.reset(reset),
 		
-		.tick(sample_valid),
+		.tick(tick),
 		
 		.samples_in(out_samples),
 		
@@ -224,9 +240,6 @@ module dsp_engine #(
 		.output_gain(output_gain),
 		.output_gains(output_gains)
 	);
-	
-	always @(posedge clk)
-		out_sample <= sample_out_processed;
 	
 	/********************************************************/
 	/* Health monitor; reports busted configs/DSP disasters */
@@ -245,7 +258,7 @@ module dsp_engine #(
 		
 		.reset(health_monitor_reset),
 		
-		.sample_valid(in_sample_valid),
+		.sample_valid(tick),
 		.sample_in(out_samples[~current_pipeline]),
 		
 		.health(health),
@@ -324,6 +337,7 @@ module dsp_engine #(
 		
 		.in_byte(command_byte),
 		.in_valid(inp_fifo_nonempty),
+		
 		.next(inp_fifo_next),
 		
 		.current_pipeline(current_pipeline),

@@ -9,8 +9,8 @@
 
 `define SPI_FIFO_LENGTH 16
 
-//`define ENABLE_SVF
-//`define ENABLE_LUTS
+`define ENABLE_SVF
+`define ENABLE_LUTS
 
 `define N_FILTERS 8
 `define N_DELAYS  8

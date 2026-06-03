@@ -224,8 +224,8 @@ module delay_master #(parameter integer data_width,
 				n_buffers_allocd <= n_buffers_allocd + 1;
 				
                 buf_info_write_data <= '0;
-				buf_info_write_data[buf_info_width                  - 1 : buf_info_width -     addr_width              ] <= alloc_addr;
-				buf_info_write_data[buf_info_width - 1 * addr_width - 1 : buf_info_width - 2 * addr_width              ] <= alloc_size_wm;
+				buf_info_write_data[buf_info_width                  - 1 : buf_info_width -     addr_width             ] <= alloc_addr;
+				buf_info_write_data[buf_info_width - 1 * addr_width - 1 : buf_info_width - 2 * addr_width             ] <= alloc_size_wm;
 				buf_info_write_data[buf_info_width - 2 * addr_width - 1 : buf_info_width - 2 * addr_width - addr_width] <= alloc_delay_wm;
 				
 				buf_info_write_handle <= n_buffers_allocd;
