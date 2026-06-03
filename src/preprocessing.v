@@ -16,6 +16,9 @@ module preprocessing_stage #(parameter integer data_width, parameter gain_format
 
 	reg signed [data_width - 1 : 0] sample_in_r;
 	reg signed [data_width - 1 : 0] sample_in_pg;
+	
+	wire signed [data_width - 1 : 0] sample_out_gain_a;
+	wire signed [data_width - 1 : 0] sample_out_gain_b;
 
 	reg in_valid_1;
 	reg in_valid_gain;
@@ -35,8 +38,8 @@ module preprocessing_stage #(parameter integer data_width, parameter gain_format
 
 			.in_valid(in_valid_gain),
 
-			.out_1(sample_out_a),
-			.out_2(sample_out_b)
+			.out_1(sample_out_gain_a),
+			.out_2(sample_out_gain_b)
 		);
 	
 	reg [15:0] cycle;
@@ -46,6 +49,9 @@ module preprocessing_stage #(parameter integer data_width, parameter gain_format
 		
 		in_valid_1 		<= tick;
 		in_valid_gain 	<= in_valid_1;
+		
+		sample_out_a <= sample_out_gain_a;
+		sample_out_b <= sample_out_gain_b;
 	
 		if (reset) begin
 			sample_out_a <= 0;
