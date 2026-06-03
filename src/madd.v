@@ -660,7 +660,7 @@ module mac_pipeline #(parameter integer data_width, parameter n_blocks = 256, pa
 	
 	wire in_ready_sh2;
 
-	shift_stage_2 #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .shift_type(shift_type)) shift_2
+	shift_stage_2 #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .shift_type(shift_type), .n_channels(n_channels)) shift_2
 		(
 			.clk(clk),
 			.reset(reset),
