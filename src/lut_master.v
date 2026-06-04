@@ -20,15 +20,34 @@ module lut_master #(parameter integer data_width) (
 		
 		input wire enable,
 		
-		input wire req,
-		input wire [`LUT_HANDLE_WIDTH - 1 : 0] lut_handle,
-		input wire [data_width - 1 : 0] req_arg,
+		output reg req_ack,
+		input wire req_valid,
+		input rw_req_t req_in,
+		output reg req_invalid,
+		output word_t req_response,
+		output reg req_response_valid
 		
-		output reg [data_width - 1 : 0] data_out,
-		output reg valid,
-		
-		output reg invalid_request
 	);
+	
+		rw_req_t pending_req;
+	reg req_pending;
+	
+	always @(posedge clk) begin
+		if (req_valid) begin
+			pending_req <= req_in;
+			req_pending <= 1;
+		end else if (req_ack) begin
+			req_pending <= 0;
+		end
+	end
+	
+	rw_req_t active_req;
+	
+	word_t req_arg_a = active_req.arg_a;
+	word_t req_arg_b = active_req.arg_b;
+	handle_t req_handle = active_req.handle;
+	logic [3:0] req_flags = active_req.flags;
+	block_addr_t req_block = active_req.block;
 	
 	reg [7:0] state = `LUT_MASTER_STATE_READY;
 	
@@ -73,21 +92,25 @@ module lut_master #(parameter integer data_width) (
 	reg wait_one = 0;
 
 	always @(posedge clk) begin
-		wait_one <= 0;
-		tanh_read <= 0;
+		wait_one  <= 0;
 		sin_read  <= 0;
-		valid <= 0;
-
+		tanh_read <= 0;
+		
+		req_ack <= 0;
+		req_invalid <= 0;
+		req_response_valid <= 0;
+		
 		if (reset) begin
-			invalid_request <= 0;
-			valid <= 0;
 			state <= `LUT_MASTER_STATE_READY;
 		end else if (enable) begin
 			case (state)
 				`LUT_MASTER_STATE_READY: begin
-					if (!wait_one && req) begin
-						lut_handle_latched 	<= lut_handle;
-						req_arg_latched 	<= req_arg;
+					if (req_pending) begin
+						req_ack <= 1;
+						
+						lut_handle_latched 	<= pending_req.handle;
+						req_arg_latched 	<= pending_req.arg_a;
+						
 						state <= `LUT_MASTER_STATE_PROCESSING;
 					end
 				end
@@ -112,7 +135,7 @@ module lut_master #(parameter integer data_width) (
 						// If it wasn't one of those, it must be an alloc'd LUT.
 						// ... to implement later
 						default: begin
-							invalid_request <= 1;
+							req_invalid <= 1;
 						end
 					endcase
 				end
@@ -148,22 +171,22 @@ module lut_master #(parameter integer data_width) (
 				
 				`LUT_MASTER_STATE_WAIT_INTERP2: begin
 					if (interp_valid) begin
-						data_out <= interpolated;
-						valid <= 1;
+						req_response <= interpolated;
+						req_response_valid <= 1;
 						state <= `LUT_MASTER_STATE_READY;
 						wait_one <= 1;
 					end
 				end
 				
 				`LUT_MASTER_STATE_SEND: begin
-					data_out <= interpolated;
-					valid <= 1;
+					req_response <= interpolated;
+					req_response_valid <= 1;
 					state <= `LUT_MASTER_STATE_READY;
 					wait_one <= 1;
 				end
 				
 				`LUT_MASTER_STATE_ERROR: begin
-				
+					req_invalid <= 1;
 				end
 			endcase
 		end	

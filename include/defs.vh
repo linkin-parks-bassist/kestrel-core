@@ -14,9 +14,15 @@
 
 `define N_FILTERS 8
 `define N_DELAYS  8
+`define N_SVF	  8
+
+`define FILTER_MEM_SIZE 128
+`define SVF_MEM_SIZE 128
 
 `define HANDLE_WIDTH 8
 
 `define GAIN_FORMAT 5
+
+`define COMMIT_ID_WIDTH 6
 
 //`define DEBUG_READS

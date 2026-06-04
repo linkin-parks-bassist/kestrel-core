@@ -4,6 +4,8 @@
 `include "lut.vh"
 `include "core.vh"
 
+import types_pkg::*;
+
 `default_nettype none
 
 module resource_branch #(parameter integer data_width, parameter handle_width = 8, parameter n_blocks = 256, parameter acc_width = 2 * data_width + 8, parameter n_channels = 16) (
@@ -248,6 +250,240 @@ module resource_branch_pulsed #(parameter integer data_width, parameter handle_w
 						
 						state <= DONE;
 					end
+				end
+				
+				DONE: begin
+					if (out_ready) begin
+						state <= IDLE;
+					end
+				end
+			endcase
+		end
+	end
+endmodule
+
+module rsp_req_str
+	(
+		input wire clk,
+		input wire reset,
+		
+		input wire enable,
+		
+		input  wire in_valid,
+		output wire in_ready,
+		
+		output wire out_valid,
+		input  wire out_ready,
+		
+		input  block_addr_t block_addr_in,
+		output block_addr_t block_addr_out,
+		
+		input wire write,
+		input handle_t handle_in,
+		
+		input word_t arg_a_in,
+		input word_t arg_b_in,
+		
+		output reg req_valid,
+		output rw_req_t req_out,
+		
+		input wire req_ack,
+		input wire req_response_valid,
+		input word_t req_response_in,
+		
+		input  channel_addr_t dest_in,
+		output channel_addr_t dest_out,
+		
+		output word_t result_out,
+		
+		input  commit_id_t commit_id_in,
+		output commit_id_t commit_id_out,
+		
+		input wire [3:0] flags_in
+	);
+	
+	
+	assign in_ready  = (state == IDLE);
+	assign out_valid = (state == DONE);
+	
+	block_addr_t   block_latched;
+	commit_id_t    commit_id_latched;
+	channel_addr_t dest_latched;
+	
+	reg write_latched;
+	
+	reg [3:0] flags_latched;
+	
+	localparam IDLE = 2'd0;
+	localparam REQ  = 2'd1;
+	localparam DONE = 2'd2;
+	
+	reg [1:0] state;
+	always @(posedge clk) begin
+		
+		req_valid <= 0;
+		
+		if (reset) begin
+			state <= IDLE;
+		end else if (enable) begin
+			case (state)
+				IDLE: begin
+					if (in_valid && in_ready) begin
+					
+						req_out.handle <= handle_in;
+						req_out.arg_a  <= arg_a_in;
+						req_out.arg_b  <= arg_b_in;
+						req_out.block  <= block_addr_in;
+						req_out.flags  <= flags_in;
+						
+						req_valid <= 1;
+						
+						dest_latched <= dest_in;
+						write_latched <= write;
+						
+						commit_id_latched 	<= commit_id_in;
+						block_latched 		<= block_addr_in;
+						
+						state <= REQ;
+					end
+				end
+				
+				REQ: begin
+					if (write_latched) begin 
+						if (req_ack) state <= IDLE;
+					end else if (req_response_valid) begin
+					
+						result_out <= req_response_in;
+						
+						commit_id_out  	<= commit_id_latched;
+						block_addr_out 	<= block_latched;
+						dest_out 		<= dest_latched;
+						
+						state <= DONE;
+					end
+				end
+				
+				DONE: begin
+					if (out_ready) begin
+						state <= IDLE;
+					end
+				end
+			endcase
+		end
+	end
+endmodule
+
+module rsp_req_str_filter
+	(
+		input wire clk,
+		input wire reset,
+		
+		input wire enable,
+		
+		input  wire in_valid,
+		output wire in_ready,
+		
+		output wire out_valid,
+		input  wire out_ready,
+		
+		input  block_addr_t block_addr_in,
+		output block_addr_t block_addr_out,
+		
+		input wire write,
+		input handle_t handle_in,
+		
+		input word_t arg_a_in,
+		input word_t arg_b_in,
+		input word_t arg_c_in,
+		input [3:0] shift_in,
+		
+		output reg req_valid,
+		output filter_rw_req_t req_out,
+		
+		input wire req_ack,
+		input wire req_response_valid,
+		input word_t req_response_in,
+		
+		input  channel_addr_t dest_in,
+		output channel_addr_t dest_out,
+		
+		output word_t result_out,
+		
+		input  commit_id_t commit_id_in,
+		output commit_id_t commit_id_out,
+		
+		input wire [3:0] flags_in
+	);
+	
+	
+	assign in_ready  = (state == IDLE);
+	assign out_valid = (state == DONE);
+	
+	block_addr_t   block_latched;
+	commit_id_t    commit_id_latched;
+	channel_addr_t dest_latched;
+	
+	reg write_latched;
+	
+	reg [3:0] flags_latched;
+	
+	localparam IDLE 	= 2'd0;
+	localparam REQ  	= 2'd1;
+	localparam DONE 	= 2'd2;
+	localparam SVF_WAIT = 2'd3;
+	
+	reg [1:0] state;
+	always @(posedge clk) begin
+		
+		req_valid <= 0;
+		
+		if (reset) begin
+			state <= IDLE;
+		end else if (enable) begin
+			case (state)
+				IDLE: begin
+					if (in_valid && in_ready) begin
+					
+						req_out.handle <= handle_in;
+						req_out.arg_a  <= arg_a_in;
+						req_out.arg_b  <= arg_b_in;
+						req_out.arg_c  <= arg_c_in;
+						req_out.shift  <= shift_in;
+						req_out.block  <= block_addr_in;
+						req_out.flags  <= flags_in;
+						
+						req_valid <= 1;
+						
+						dest_latched <= dest_in;
+						write_latched <= write;
+						
+						commit_id_latched 	<= commit_id_in;
+						block_latched 		<= block_addr_in;
+						
+						if (flags_in == `FILTER_REQ_TYPE_SVF)
+							state <= SVF_WAIT;
+						else
+							state <= REQ;
+					end
+				end
+				
+				REQ: begin
+					if (write_latched) begin 
+						if (req_ack) state <= IDLE;
+					end else if (req_response_valid) begin
+					
+						result_out <= req_response_in;
+						
+						commit_id_out  	<= commit_id_latched;
+						block_addr_out 	<= block_latched;
+						dest_out 		<= dest_latched;
+						
+						state <= DONE;
+					end
+				end
+				
+				SVF_WAIT: begin
+					if (req_ack) state <= IDLE;
 				end
 				
 				DONE: begin

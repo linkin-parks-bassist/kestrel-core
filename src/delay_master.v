@@ -1,5 +1,7 @@
 `include "defs.vh"
 
+import types_pkg::*;
+
 `default_nettype none
 
 module delay_master #(parameter integer data_width,
@@ -12,21 +14,14 @@ module delay_master #(parameter integer data_width,
 		
 		input wire enable,
 		
-		input wire read_req,
 		input wire alloc_req,
-		input wire write_req,
 		
-		output reg signed [data_width - 1 : 0] data_out,
-		output reg read_valid,
-		output reg write_ack,
-		
-		input wire [data_width - 1 : 0] read_handle,
-		input wire [data_width - 1 : 0] write_handle,
-		
-		input wire signed [data_width - 1 : 0] write_data,
-		
-		input wire signed [data_width - 1 : 0] read_depth,
-		input wire signed [data_width - 1 : 0] read_offset,
+		output reg req_ack,
+		input wire req_valid,
+		input rw_req_t req_in,
+		output reg req_invalid,
+		output word_t req_response,
+		output reg req_response_valid,
 		
 		output reg mem_req,
 		output reg mem_req_type,
@@ -54,6 +49,26 @@ module delay_master #(parameter integer data_width,
         
         input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in
 	);
+	
+	rw_req_t pending_req;
+	reg req_pending;
+	
+	always @(posedge clk) begin
+		if (req_valid) begin
+			pending_req <= req_in;
+			req_pending <= 1;
+		end else if (req_ack) begin
+			req_pending <= 0;
+		end
+	end
+	
+	rw_req_t active_req;
+	
+	word_t req_arg_a = active_req.arg_a;
+	word_t req_arg_b = active_req.arg_b;
+	handle_t req_handle = active_req.handle;
+	logic [3:0] req_flags = active_req.flags;
+	block_addr_t req_block = active_req.block;
 	
     reg alloc_req_r;
     reg [addr_width - 1 : 0] alloc_size_r;
@@ -163,36 +178,21 @@ module delay_master #(parameter integer data_width,
 	wire signed [2 * data_width - 1 : 0] product_a = $signed(mul_a) * $signed(mul_b);
 	reg  signed [2 * data_width - 1 : 0] product_a_r;
 	
-	wire [addr_width  - 1 : 0] alloc_size_wm  = alloc_size_r [addr_width  - 1 : 0];
+	wire [addr_width - 1 : 0] alloc_size_wm  = alloc_size_r [addr_width - 1 : 0];
 	wire [addr_width - 1 : 0] alloc_delay_wm = alloc_delay_r[addr_width - 1 : 0];
 	
-	reg  read_req_prev;
-	wire read_req_posedge = read_req & ~read_req_prev;
-	reg  read_req_posedge_latched;
-	wire read_req_pending = read_req | read_req_posedge_latched;
-	
-	reg  write_req_prev;
-	wire write_req_posedge = write_req & ~write_req_prev;
-	reg  write_req_posedge_latched;
-	wire write_req_pending = write_req | write_req_posedge_latched;
-	
 	always @(posedge clk) begin
-		write_ack <= 0;
-		read_valid <= 0;
+		req_ack <= 0;
+		req_response_valid <= 0;
 		
 		buf_info_write_enable <= 0;
 		
 		invalid_alloc <= 0;
 		invalid_write <= 0;
 		invalid_read  <= 0;
-        
-		read_req_prev <= read_req;
-		read_req_posedge_latched <= read_req_posedge | read_req_posedge_latched;
-		
-		write_req_prev <= write_req;
-		write_req_posedge_latched <= write_req_posedge | write_req_posedge_latched;
 		
 		mem_req <= 0;
+		req_ack <= 0;
 		
 		state_prev <= state;
 		
@@ -209,11 +209,6 @@ module delay_master #(parameter integer data_width,
 			
 			alloc_addr <= 0;
 			n_buffers_allocd <= 0;
-			
-			read_req_prev  <= 0;
-			write_req_prev <= 0;
-			read_req_posedge_latched  <= 0;
-			write_req_posedge_latched <= 0;
 			
 		end else if (alloc_req_r) begin
 			if (alloc_too_big || buffers_exhausted) begin
@@ -234,29 +229,33 @@ module delay_master #(parameter integer data_width,
 		end else if (enable) begin
 			case (state)
 				IDLE: begin
-					if (read_req_pending) begin
-						read_handle_r <= read_handle;
-						buf_info_read_handle <= read_handle;
+					if (req_pending) begin
+						active_req <= pending_req;
+						req_ack <= 1;
 						
-						invalid_read <= !buffer_initd[read_handle];
-						
-						mul_a <= read_depth < 1 ? 0 : read_depth;
-						mul_b <= read_offset;
-						
-						read_req_posedge_latched <= 0;
-						
-						state <= buffer_initd[read_handle] ? READ_1 : IDLE;
-						
-					end else if (write_req_pending) begin
-						write_data_r <= write_data;
-						write_handle_r <= write_handle;
-						buf_info_read_handle <= write_handle;
-						
-						write_req_posedge_latched <= 0;
-						
-						invalid_write <= !buffer_initd[write_handle];
-						
-						state <= buffer_initd[write_handle] ? WRITE_1 : IDLE;
+						case (pending_req.flags)
+							4'd0: begin
+								read_handle_r <= pending_req.handle;
+								buf_info_read_handle <= pending_req.handle;
+								
+								invalid_read <= !buffer_initd[pending_req.handle];
+								
+								mul_a <= pending_req.arg_a < 1 ? 0 : pending_req.arg_a;
+								mul_b <= pending_req.arg_b;
+								
+								state <= buffer_initd[pending_req.handle] ? READ_1 : IDLE;
+							end
+							
+							4'd1: begin
+								write_data_r <= pending_req.arg_a;
+								write_handle_r <= pending_req.handle;
+								buf_info_read_handle <= pending_req.handle;
+								
+								invalid_write <= !buffer_initd[pending_req.handle];
+								
+								state <= buffer_initd[pending_req.handle] ? WRITE_1 : IDLE;
+							end
+						endcase
 					end
 				end
 				
@@ -322,9 +321,9 @@ module delay_master #(parameter integer data_width,
                 
 				
 				READ_9: begin
-					data_out 	<= product_a_r >>> (data_width - 2);
-					read_valid  <= 1;
-					state 		<= IDLE;
+					req_response 		<= product_a_r >>> (data_width - 2);
+					req_response_valid  <= 1;
+					state 				<= IDLE;
 				end
 				
 				WRITE_1: begin
@@ -356,7 +355,6 @@ module delay_master #(parameter integer data_width,
 				
 				WRITE_4: begin
 					if (mem_write_ack) begin
-						write_ack <= 1;
 						state <= IDLE;
 					end
 				end

@@ -135,7 +135,7 @@ module instr_decoder #(parameter integer data_width)
 			`BLOCK_INSTR_SVF_BAND: 	flags = `FILTER_REQ_TYPE_SVF_BAND;
 			`BLOCK_INSTR_POLY: 		flags = `FILTER_REQ_TYPE_POLY;
 			
-			default:				flags = 4'b0000;
+			default:				flags = writes_external ? 4'd1 : 4'd0;
 		endcase
 	end
 	

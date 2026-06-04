@@ -1,1 +1,1 @@
-`define COMMIT_ID_WIDTH 6
+

@@ -1,7 +1,7 @@
 `include "filter.vh"
 `include "defs.vh"
 
-module filter_master #(parameter integer data_width, parameter integer math_width, parameter n_filters = 128, parameter mem_size = 2048)
+module filter_unit_normal
 	(
 		input wire clk,
 		input wire reset,
@@ -17,19 +17,37 @@ module filter_master #(parameter integer data_width, parameter integer math_widt
 		
 		output reg coef_ack,
 		
-		input wire calc_req,
-        input wire [3:0] req_type_in,
-        
-		input wire [7:0] handle_in,
-		input wire signed [data_width - 1 : 0] data_in,
-		output reg signed [data_width - 1 : 0] data_out,
-		output reg out_valid,
+		output reg req_ack,
+		input wire req_valid,
+		input rw_req_t req_in,
+		output reg req_invalid,
+		output word_t req_response,
+		output reg req_response_valid,
 
         input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
         
-        
         output wire stuck
 	);
+	
+	rw_req_t pending_req;
+	reg req_pending;
+	
+	always @(posedge clk) begin
+		if (req_valid) begin
+			pending_req <= req_in;
+			req_pending <= 1;
+		end else if (req_ack) begin
+			req_pending <= 0;
+		end
+	end
+	
+	rw_req_t active_req;
+	
+	word_t req_arg_a = active_req.arg_a;
+	word_t req_arg_b = active_req.arg_b;
+	handle_t req_handle = active_req.handle;
+	logic [3:0] req_flags = active_req.flags;
+	block_addr_t req_block = active_req.block;
 	
 	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
 	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
@@ -41,8 +59,9 @@ module filter_master #(parameter integer data_width, parameter integer math_widt
 			stuck_ctr <= stuck_ctr + 1;
 	end
 	
-	localparam handle_width = $clog2(n_filters);
-	localparam addr_width   = $clog2(mem_size);
+	localparam handle_width = $clog2(`N_FILTERS);
+	localparam addr_width   = $clog2(`FILTER_MEM_SIZE);
+	
 	localparam degree_width = data_width;
 	localparam config_width = 
 		   addr_width    // address
@@ -87,12 +106,12 @@ module filter_master #(parameter integer data_width, parameter integer math_widt
         end
     end
 
-	reg signed [math_width - 1 : 0] coef_mem_a [mem_size  - 1 : 0];
-	reg signed [math_width - 1 : 0] coef_mem_b [mem_size  - 1 : 0];
-	reg signed [math_width - 1 : 0] state_mem  [mem_size  - 1 : 0];
-	reg [config_width - 1 : 0] config_mem [n_filters - 1 : 0];
+	reg signed [math_width - 1 : 0] coef_mem_a [`FILTER_MEM_SIZE  - 1 : 0];
+	reg signed [math_width - 1 : 0] coef_mem_b [`FILTER_MEM_SIZE  - 1 : 0];
+	reg signed [math_width - 1 : 0] state_mem  [`FILTER_MEM_SIZE  - 1 : 0];
+	reg [config_width - 1 : 0] config_mem [`N_FILTERS - 1 : 0];
 	
-	reg [n_filters - 1 : 0] state_invalid;
+	reg [`N_FILTERS - 1 : 0] state_invalid;
 
 	reg         [addr_width - 1 : 0] coef_mem_read_addr;
 	reg signed  [math_width - 1 : 0] coef_mem_a_read_val;
@@ -139,8 +158,8 @@ module filter_master #(parameter integer data_width, parameter integer math_widt
 	
 	reg busy;
 	
-	wire filter_capacity = (next_handle < n_filters);
-	wire mem_capacity = (next_addr + order_ff_r + order_fb_r < mem_size);
+	wire filter_capacity = (next_handle < `N_FILTERS);
+	wire mem_capacity = (next_addr + order_ff_r + order_fb_r < `FILTER_MEM_SIZE);
 	
 	reg [addr_width - 1 : 0] coef_target_addr;
 	reg signed [math_width - 1 : 0] coef_to_write;
@@ -211,7 +230,7 @@ module filter_master #(parameter integer data_width, parameter integer math_widt
 	wire poly_mode = (req_type_r == `FILTER_REQ_TYPE_POLY);
 	
 	always @(posedge clk) begin
-		out_valid <= 0;
+		req_response_valid <= 0;
 		wait_one <= 0;
 		
 		config_mem_write_enable <= 0;
@@ -237,7 +256,7 @@ module filter_master #(parameter integer data_width, parameter integer math_widt
 			
 			state_invalid <= ~0;
 
-			data_out <= 0;
+			req_response <= 0;
 			
 			current_addr <= 0;
 			current_order_ff <= 0;
@@ -408,9 +427,9 @@ module filter_master #(parameter integer data_width, parameter integer math_widt
 					SEND: begin
 						busy <= 0;
 						
-						data_out <= resul_sat;
+						req_response <= resul_sat;
 						
-						out_valid <= 1;
+						req_response_valid <= 1;
 						calculating <= 0;
 						calc_cooldown <= 1;
 						state_invalid[handle_r] <= 0;
@@ -440,26 +459,494 @@ module filter_master #(parameter integer data_width, parameter integer math_widt
 				coef_committing <= 1;
 				wait_one <= 1;
 				busy <= 1;
-			end else if (~calc_cooldown & calc_req) begin
-				if (handle_in >= next_handle) begin
-					out_valid <= 1;
-					data_out <= data_in;
+			end else if (req_pending) begin
+				req_ack <= 1;
+			
+				if (pending_req.handle >= next_handle) begin
+					req_response_valid <= 1;
+					req_response <= pending_req.arg_a;
 				end else begin
 					busy <= 1;
+					wait_one <= 1;
 					calculating <= 1;
-					config_mem_read_addr <= handle_in;
-					wait_one <= 1;
-					accumulator <= 0;
-					run_state <= FETCH_CONFIG;
-					wait_one <= 1;
-					invalid_state <= state_invalid[handle_in];
-					handle_r <= handle_in;
-					data_in_r <= req_type_in[0] ? data_out : data_in;
-					req_type_r <= req_type_in;
 					
-					if (req_type_in == `FILTER_REQ_TYPE_POLY) begin
+					config_mem_read_addr <= pending_req.handle;
+					
+					accumulator <= 0;
+					
+					invalid_state <= state_invalid[pending_req.handle];
+					
+					handle_r <= pending_req.handle;
+					data_in_r <= pending_req.flags[0] ? req_response : pending_req.arg_a;
+					req_type_r <= pending_req.flags;
+					
+					if (pending_req.flags == `FILTER_REQ_TYPE_POLY) begin
 						pow <= (1 << data_width - 1);
 					end
+					
+					run_state <= FETCH_CONFIG;
+				end
+			end
+		end
+	end
+endmodule
+
+module filter_unit_svf
+	(
+		input wire clk,
+		input wire reset,
+		
+		input wire enable,
+		
+		output reg req_ack,
+		input wire req_valid,
+		output reg req_invalid,
+		input filter_rw_req_t req_in,
+		
+		output reg 		low_valid,
+		output sample_t low_out,
+		output reg 		band_valid,
+		output sample_t band_out,
+		output reg 		high_valid,
+		output sample_t high_out
+	);
+	
+	filter_rw_req_t pending_req;
+	reg req_pending;
+	
+	always @(posedge clk) begin
+		if (req_valid) begin
+			pending_req <= req_in;
+			req_pending <= 1;
+		end else if (req_ack) begin
+			req_pending <= 0;
+		end
+	end
+	
+	filter_rw_req_t active_req;
+	
+	word_t req_arg_a = active_req.arg_a;
+	word_t req_arg_b = active_req.arg_b;
+	word_t req_arg_c = active_req.arg_c;
+	word_t req_shift = active_req.shift;
+	handle_t req_handle = active_req.handle;
+	logic [3:0] req_flags = active_req.flags;
+	block_addr_t req_block = active_req.block;
+	
+	localparam handle_addr_width = $clog2(`N_SVF);
+	
+	reg signed [2 * math_width - 1 : 0] state_mem [`N_SVF - 1 : 0];
+	reg signed [2 * math_width - 1 : 0] state_mem_write_val;
+	reg signed [2 * math_width - 1 : 0] state_mem_read_val;
+	reg [handle_addr_width  - 1 : 0] state_mem_write_addr;
+	reg [handle_addr_width  - 1 : 0] state_mem_read_addr;
+	
+	reg state_mem_write_enable;
+	
+	always @(posedge clk) begin
+		if (state_mem_write_enable)
+			state_mem[state_mem_write_addr] <= state_mem_write_val;
+		
+		state_mem_read_val <= state_mem[state_mem_read_addr];
+	end
+	
+	reg [handle_addr_width - 1 : 0] n_slots_used;
+	
+	sample_t arg_a_pending = pending_req.arg_a;
+	
+	reg signed [math_width - 1 : 0] data_in_r;
+	reg signed [math_width - 1 : 0] cutoff_in_r;
+	reg signed [math_width - 1 : 0] d_in_r;
+	reg [4 : 0] shift_in_r;
+	
+	reg signed [math_width - 1 : 0] low;
+	reg signed [math_width - 1 : 0] band;
+	reg signed [math_width - 1 : 0] high;
+	
+	reg [handle_addr_width - 1 : 0] prev_slot;
+	reg [handle_addr_width - 1 : 0] current_slot;
+	reg [block_addr_w  - 1 : 0] prev_block;
+	
+	reg signed [math_width - 1 : 0] factor_a;
+	reg signed [math_width - 1 : 0] factor_b;
+	
+	wire signed [2 * math_width - 1 : 0] product = factor_a * factor_b;
+	reg  signed [2 * math_width - 1 : 0] product_r;
+	
+	wire signed [math_width - 1 : 0] product_r_plus_low  = low  + (product_r >>> (data_width - 1));
+	wire signed [math_width - 1 : 0] band_plus_product_r = band + (product_r >>> (data_width - 1));
+	
+	wire signed [math_width - 1 : 0] x_minus_low_minus_product_r = data_in_r - low - (product_r >>> (data_width - 1 - shift_in_r));
+	
+	wire blocks_wrapped = (pending_req.block <= prev_block);
+	wire new_slot_needed = ~|n_slots_used | ((prev_slot == (n_slots_used - 1)) & ~blocks_wrapped);
+	wire req_inv = new_slot_needed && (n_slots_used == `N_SVF);
+	
+	localparam IDLE 			= 4'd0;
+	localparam STATE_LOAD_WAIT 	= 4'd1;
+	localparam STATE_LOAD 		= 4'd2;
+	localparam CALC_1 			= 4'd3;
+	localparam CALC_2 			= 4'd4;
+	localparam CALC_3 			= 4'd5;
+	localparam CALC_4 			= 4'd6;
+	localparam CALC_5 			= 4'd7;
+	localparam CALC_6 			= 4'd8;
+	localparam CALC_7 			= 4'd9;
+	localparam CALC_8 			= 4'd10;
+	
+	reg [3:0] state;
+	
+	localparam signed [math_width - 1 : 0] sat_max = ( 1 << (data_width - 1)) - 1;
+	localparam signed [math_width - 1 : 0] sat_min = (-1 << (data_width - 1));
+	
+	wire signed [data_width - 1 : 0] low_sat  = (low  > sat_max) ? sat_max : ((low  < sat_min) ? sat_min : low);
+	wire signed [data_width - 1 : 0] band_sat = (band > sat_max) ? sat_max : ((band < sat_min) ? sat_min : band);
+	wire signed [data_width - 1 : 0] high_sat = (high > sat_max) ? sat_max : ((high < sat_min) ? sat_min : high);
+	
+	wire signed [2 * math_width - 1 : 0] band_normalised 	= d_in_r * band;
+	wire signed [math_width - 1 : 0] band_normalised_sh 	= band_normalised >> (data_width - 1 - shift_in_r);
+	reg  signed [math_width - 1 : 0] band_normalised_sh_r;
+	wire signed [data_width - 1 : 0] band_normalised_sh_sat	= (band_normalised_sh_r > sat_max) ? sat_max : ((band_normalised_sh_r < sat_min) ? sat_min : band_normalised_sh_r);
+	
+	always @(posedge clk) begin
+		req_ack <= 0;
+		req_invalid <= 0;
+		
+		if (reset) begin
+			state <= IDLE;
+			n_slots_used <= 0;
+			
+			low_valid  <= 0;
+			band_valid <= 0;
+			high_valid <= 0;
+		end else if (enable) begin
+			product_r <= product;
+			state_mem_write_enable <= 0;
+			
+			case (state)
+				IDLE: begin
+					if (req_pending) begin
+						req_ack <= 1;
+						
+						low_valid  <= 0;
+						band_valid <= 0;
+						high_valid <= 0;
+						if (new_slot_needed) begin // need to allocate a new slot
+							if (n_slots_used == `N_SVF) begin
+								req_invalid <= 1;
+								low_out  <= 0;
+								band_out <= 0;
+								high_out <= 0;
+							end else begin
+								current_slot <= n_slots_used;
+								n_slots_used <= n_slots_used + 1;
+								
+								state_mem_write_val <= 0;
+								state_mem_write_addr <= n_slots_used;
+								state_mem_write_enable <= 1;
+								
+								low <= 0;
+								band <= 0;
+								
+								state <= CALC_1;
+							end
+						end else if (blocks_wrapped) begin
+							current_slot <= 0;
+							state_mem_read_addr <= 0;
+							state <= STATE_LOAD_WAIT;
+						end else begin
+							current_slot <= current_slot + 1;
+							state_mem_read_addr <= current_slot + 1;
+							state <= STATE_LOAD_WAIT;
+						end
+						
+						data_in_r 	<= pending_req.arg_a << (math_width - data_width);
+						cutoff_in_r <= pending_req.arg_b << (math_width - data_width);
+						d_in_r 		<= pending_req.arg_c << (math_width - data_width);
+						shift_in_r  <= pending_req.shift;
+						
+						prev_block <= pending_req.block;
+					end
+				end
+				
+				STATE_LOAD_WAIT: begin
+					state <= STATE_LOAD;
+				end
+				
+				STATE_LOAD: begin
+					{low, band} <= state_mem_read_val;
+					state <= CALC_1;
+				end
+				
+				CALC_1: begin
+					factor_a <= cutoff_in_r;
+					factor_b <= band;
+					
+					state <= CALC_2;
+				end
+				
+				CALC_2: begin
+					// product_r <= product (automatic)
+					factor_a <= d_in_r;
+					factor_b <= band;
+					
+					state <= CALC_3;
+				end
+				
+				CALC_3: begin
+					low <= product_r_plus_low;
+					state <= CALC_4;
+				end
+				
+				CALC_4: begin
+					high <= x_minus_low_minus_product_r;
+					factor_a <= cutoff_in_r;
+					factor_b <= x_minus_low_minus_product_r;
+					
+					state <= CALC_5;
+				end
+				
+				CALC_5: begin
+					state <= CALC_6;
+				end
+				
+				CALC_6: begin
+					band <= band_plus_product_r;
+					
+					high_out <= high_sat;
+					low_out  <= low_sat;
+					
+					high_valid <= 1;
+					low_valid <= 1;
+					
+					factor_a <= band_plus_product_r;
+					factor_b <= d_in_r;
+					
+					state_mem_write_val <= {low, band_plus_product_r};
+					state_mem_write_addr <= current_slot;
+					state_mem_write_enable <= 1;
+					
+					state <= CALC_7;
+				end
+				
+				CALC_7: begin
+					band_out <= band_sat;
+					
+					band_valid <= 1;
+					prev_slot <= current_slot;
+					state <= IDLE;
+				end
+			endcase
+		end
+	end
+endmodule
+
+module filter_master
+	(
+		input wire clk,
+		input wire reset,
+		input wire enable,
+		
+		input wire alloc_req,
+		
+		input wire coef_write,
+		input wire coef_commit,
+		input wire [7:0] coef_write_handle,
+		input wire [data_width - 1 : 0] coef_target,
+		input wire signed [math_width - 1 : 0] coef_data,
+		
+		output reg coef_ack,
+		
+		output reg req_ack,
+		input wire req_valid,
+		input filter_rw_req_t req_in,
+		output reg req_invalid,
+		output word_t req_response,
+		output reg req_response_valid,
+
+        input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
+        
+        output wire stuck
+	);
+
+	reg pending_target_svf;
+	reg active_target_svf;
+	
+	filter_rw_req_t pending_req;
+	reg req_pending;
+	
+	always @(posedge clk) begin
+		if (req_valid) begin
+			pending_req <= req_in;
+			req_pending <= 1;
+			
+			pending_target_svf <= req_in.flags != `FILTER_REQ_TYPE_FILTER
+							   && req_in.flags != `FILTER_REQ_TYPE_FCASC
+							   && req_in.flags != `FILTER_REQ_TYPE_POLY;
+		end else if (req_ack) begin
+			req_pending <= 0;
+		end
+	end
+	
+	filter_rw_req_t active_req;
+	
+	word_t req_arg_a = active_req.arg_a;
+	word_t req_arg_b = active_req.arg_b;
+	handle_t req_handle = active_req.handle;
+	logic [3:0] req_flags = active_req.flags;
+	block_addr_t req_block = active_req.block;
+
+	wire filter_req_ack;
+	reg  filter_req_valid;
+	rw_req_t filter_req_in;
+	wire filter_req_invalid;
+	word_t filter_req_response;
+	wire filter_req_response_valid;
+	wire filter_stuck;
+	
+	filter_unit_normal filters (
+			.clk(clk),
+			.reset(reset),
+			.enable(enable),
+			
+			.alloc_req(alloc_req),
+			
+			.coef_write(coef_write),
+			.coef_commit(coef_commit),
+			.coef_write_handle(coef_write_handle),
+			.coef_target(coef_target),
+			.coef_data(coef_data),
+			
+			.coef_ack(coef_ack),
+			
+			.req_ack(filter_req_ack),
+			.req_valid(filter_req_valid),
+			.req_in(filter_req_in),
+			.req_invalid(filter_req_invalid),
+			.req_response(filter_req_response),
+			.req_response_valid(filter_req_response_valid),
+
+			.ctrl_data_in(ctrl_data_in),
+			
+			.stuck(filter_stuck)
+		);
+	
+	wire svf_req_ack;
+	reg  svf_req_valid;
+	wire svf_req_invalid;
+	filter_rw_req_t svf_req_in;
+
+	wire svf_low_valid;
+	wire svf_band_valid;
+	wire svf_high_valid;
+	
+	sample_t svf_low_out;
+	sample_t svf_band_out;
+	sample_t svf_high_out;
+	
+	filter_unit_svf svfs (
+			.clk(clk),
+			.reset(reset),
+			.enable(enable),
+			
+			.req_ack(svf_req_ack),
+			.req_valid(svf_req_valid),
+			.req_invalid(svf_req_invalid),
+			.req_in(svf_req_in),
+			
+			.low_out(svf_low_out),
+			.band_out(svf_band_out),
+			.high_out(svf_high_out),
+			
+			.low_valid(svf_low_valid),
+			.band_valid(svf_band_valid),
+			.high_valid(svf_high_valid)
+		);
+	
+	reg busy;
+	
+	always @(posedge clk) begin
+		req_ack <= 0;
+		req_invalid <= 0;
+		req_response_valid <= 0;
+		
+		svf_req_valid <= 0;
+		filter_req_valid <= 0;
+	
+		if (reset) begin
+			busy <= 0;
+		end else if (busy) begin
+			if (active_target_svf) begin
+				if (svf_req_invalid) begin
+					req_invalid <= 1;
+					busy <= 0;
+				end else
+					case (active_req.flags)
+						`FILTER_REQ_TYPE_SVF: begin
+							if (svf_req_ack) begin
+								busy <= 0;
+							end
+						end
+						
+						`FILTER_REQ_TYPE_SVF_LOW: begin
+							if (svf_low_valid) begin
+								req_response <= svf_low_out;
+								req_response_valid <= 1;
+								busy <= 0;
+							end
+						end
+						
+						`FILTER_REQ_TYPE_SVF_BAND: begin
+							if (svf_band_valid) begin
+								req_response <= svf_band_out;
+								req_response_valid <= 1;
+								busy <= 0;
+							end
+						end
+						
+						`FILTER_REQ_TYPE_SVF_HIGH: begin
+							if (svf_high_valid) begin
+								req_response <= svf_high_out;
+								req_response_valid <= 1;
+								busy <= 0;
+							end
+						end
+					endcase
+					if (svf_req_ack) begin
+					busy <= 0;
+				end
+			end else begin
+				if (filter_req_invalid) begin
+					req_invalid <= 1;
+					busy <= 0;
+				end else if (filter_req_response_valid) begin
+					req_response_valid <= 1;
+					req_response <= filter_req_response;
+					busy <= 0;
+				end
+			end
+		end else begin
+			if (req_pending) begin
+				active_req <= pending_req;
+				req_ack <= 1;
+				
+				active_target_svf <= pending_target_svf;
+				
+				busy <= 1;
+				if (pending_target_svf) begin
+					busy <= 1;
+					
+					if (req_in.flags == `FILTER_REQ_TYPE_SVF) begin
+						svf_req_in <= req_in;
+						svf_req_valid <= 1;
+					end
+				end else begin
+					filter_req_in.handle <= pending_req.handle;
+					filter_req_in.arg_a  <= pending_req.arg_a;
+					filter_req_in.arg_b  <= pending_req.arg_b;
+					filter_req_in.flags  <= pending_req.flags;
+					filter_req_in.block  <= pending_req.block;
+					filter_req_valid <= 1;
 				end
 			end
 		end

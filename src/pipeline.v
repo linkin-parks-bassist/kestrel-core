@@ -3,6 +3,8 @@
 `include "core.vh"
 `include "lut.vh"
 
+import types_pkg::*;
+
 `default_nettype none
 
 `define PIPELINE_READY 			0
@@ -78,6 +80,8 @@ module dsp_pipeline #(
 	
     wire [7:0] core_out;
     wire [15:0] stuck_flags_core;
+    wire core_ready;
+
 
 	dsp_core #(
 		.data_width(data_width),
@@ -101,28 +105,25 @@ module dsp_pipeline #(
 		.command_reg_1_write(reg_1_write),
 		.command_instr_write(instr_write),
 		
+		.delay_req(delay_req),
+		.delay_req_ack(delay_req_ack),
+		.delay_req_valid(delay_req_valid),
+		.delay_req_response(delay_req_response),
+		.delay_req_response_valid(delay_req_response_valid),
+		
+		.filter_req(filter_req),
+		.filter_req_ack(filter_req_ack),
+		.filter_req_valid(filter_req_valid),
+		.filter_req_invalid(filter_req_invalid),
+		.filter_req_response(filter_req_response),
+		.filter_req_response_valid(filter_req_response_valid),
+		
 		.lut_req(lut_req),
-		.lut_handle(lut_req_handle),
-		.lut_arg(lut_req_arg),
-		.lut_data(lut_data),
-		.lut_valid(lut_valid),
-		
-		.delay_read_req   (delay_read_req),
-		.delay_write_req  (delay_write_req),
-		.delay_req_handle (delay_req_handle),
-		.delay_write_data (delay_write_data),
-		.delay_read_data  (delay_read_data),
-		.delay_read_depth (delay_read_depth),
-		.delay_read_offset(delay_read_offset),
-		.delay_read_valid (delay_read_valid),
-		.delay_write_ack  (delay_write_ack),
-		
-		.filter_calc_req(filter_calc_req),
-		.filter_handle_out(filter_handle_out),
-		.filter_data_out(filter_data_out),
-		.filter_data_in(filter_data_in),
-		.filter_data_valid(filter_data_valid),
-		.filter_req_type(filter_req_type),
+		.lut_req_ack(lut_req_ack),
+		.lut_req_valid(lut_req_valid),
+		.lut_req_invalid(lut_req_invalid),
+		.lut_req_response(lut_req_response),
+		.lut_req_response_valid(lut_req_response_valid),
 		
 		.reg_writes_commit(reg_writes_commit),
 		.regfile_syncing(regfile_syncing),
@@ -136,22 +137,6 @@ module dsp_pipeline #(
 		.data_return_valid(data_return_valid_core),
 
         .ctrl_data_in(ctrl_data_in),
-        
-        .svf_data_out(svf_data_in),
-		.svf_cutoff_out(svf_cutoff_in),
-		.svf_d_out(svf_d_in),
-		
-		.svf_shift_out(svf_shift_in),
-		
-		.svf_low_in(svf_low_out),
-		.svf_band_in(svf_band_out),
-		.svf_high_in(svf_high_out),
-	
-		.svf_data_valid(svf_data_valid),
-		
-		.svf_req(svf_req),
-		.svf_ack(svf_ack),
-		.svf_block_out(svf_block_in),
 		
 		.stuck_flags(stuck_flags_core)
 	);
@@ -167,8 +152,6 @@ module dsp_pipeline #(
 		end
 	end
 	
-	
-	
 	/************************/
 	/* Peripheral resources */
 	/************************/
@@ -181,15 +164,20 @@ module dsp_pipeline #(
 		
 		.enable(pr_enable),
 		
-		.lut_handle(lut_req_handle),
-		.req_arg(lut_req_arg),
-		.req(lut_req),
-		
-		.data_out(lut_data),
-		.valid(lut_valid),
-		
-		.invalid_request(invalid_lut_request)
+		.req_in(lut_req),
+		.req_ack(lut_req_ack),
+		.req_valid(lut_req_valid),
+		.req_invalid(lut_req_invalid),
+		.req_response(lut_req_response),
+		.req_response_valid(lut_req_response_valid)
 	);
+	
+	rw_req_t lut_req;
+	wire lut_req_ack;
+	wire lut_req_valid;
+	wire lut_req_invalid;
+	word_t lut_req_response;
+	wire lut_req_response_valid;
 	`else
 	assign lut_valid = 0;
 	`endif
@@ -201,7 +189,14 @@ module dsp_pipeline #(
     wire any_delay_buffers;
     
     wire stuck_delay;
-
+    
+	rw_req_t delay_req;
+	wire delay_req_ack;
+	wire delay_req_valid;
+	wire delay_req_invalid;
+	word_t delay_req_response;
+	wire delay_req_response_valid;
+    
 	delay_master #(
 		.data_width(data_width), 
 		.n_buffers(`N_DELAYS),
@@ -212,23 +207,16 @@ module dsp_pipeline #(
 		
 		.enable(pr_enable),
 		
-		.alloc_req  (alloc_delay),
+		.alloc_req(alloc_delay),
 		
-		.read_req (delay_read_req),
-		.write_req(delay_write_req),
+		.req_in(delay_req),
+		.req_ack(delay_req_ack),
+		.req_valid(delay_req_valid),
+		.req_invalid(delay_req_invalid),
+		.req_response(delay_req_response),
+		.req_response_valid(delay_req_response_valid),
 		
-		.write_handle(delay_req_handle),
-		.read_handle (delay_req_handle),
-		.read_depth	 (delay_read_depth),
-		.read_offset (delay_read_offset),
-		.write_data  (delay_write_data),
-			
-		.data_out(delay_read_data),
-		
-		.read_valid(delay_read_valid),
-		.write_ack(delay_write_ack),
-		
-		.mem_req (sdram_req),
+		.mem_req(sdram_req),
 		.mem_req_type(sdram_req_type),
 		
 		.mem_addr(sdram_addr),
@@ -265,8 +253,19 @@ module dsp_pipeline #(
 	wire [17 : 0] filter_coef_data = ctrl_data_in[17:0];
 	
     wire stuck_filter;
+    
+    filter_rw_req_t filter_req;
+	wire filter_req_ack;
+	wire filter_req_valid;
+	wire filter_req_invalid;
+	word_t filter_req_response;
+	wire filter_req_response_valid;
 	
-	filter_master #(.data_width(data_width), .math_width(`FILTER_COEF_WIDTH), .n_filters(`N_FILTERS), .mem_size(128)) filters (
+	word_t svf_req_response_low;
+	word_t svf_req_response_band;
+	word_t svf_req_response_high;
+	
+	filter_master filters (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -279,72 +278,19 @@ module dsp_pipeline #(
 		.coef_write_handle(filter_coef_write_handle),
 		.coef_target(filter_coef_target),
 		.coef_data(filter_coef_data),
-		
 		.coef_ack(filter_ack),
 		
-		.calc_req(filter_calc_req),
-        .req_type_in(filter_req_type),
-        
-		.handle_in(filter_handle_out),
-		.data_in(filter_data_out),
-		.data_out(filter_data_in),
-		.out_valid(filter_data_valid),
+		.req_in(filter_req),
+		.req_ack(filter_req_ack),
+		.req_valid(filter_req_valid),
+		.req_invalid(filter_req_invalid),
+		.req_response(filter_req_response),
+		.req_response_valid(filter_req_response_valid),
 
         .ctrl_data_in(ctrl_data_in),
         
-        
         .stuck(stuck_filter)
 	);
-	
-	wire signed [data_width - 1 : 0] svf_data_in;
-	wire [data_width - 1 : 0] svf_cutoff_in;
-	wire [data_width - 1 : 0] svf_d_in;
-	
-	wire signed [data_width - 1 : 0] svf_low_out;
-	wire signed [data_width - 1 : 0] svf_band_out;
-	wire signed [data_width - 1 : 0] svf_high_out;
-	
-	wire svf_data_valid;
-	
-	wire svf_req;
-	wire [$clog2(n_blocks) - 1 : 0] svf_block_in;
-	
-	wire svf_ack;
-	
-	wire svf_slot_alloc_fail;
-	
-	wire [4 : 0] svf_shift_in;
-	
-	`ifdef ENABLE_SVF
-	svf_master #(.data_width(data_width), .math_width(data_width), .block_addr_width($clog2(n_blocks)), .n_slots(32)) svf
-	(
-		.clk(clk),
-		.reset(reset | resetting),
-		
-		.enable(pr_enable),
-		
-		.data_in(svf_data_in),
-		.cutoff_in(svf_cutoff_in),
-		.d_in(svf_d_in),
-		
-		.shift_in(svf_shift_in),
-		
-		.low_out(svf_low_out),
-		.band_out(svf_band_out),
-		.high_out(svf_high_out),
-		
-		.data_valid(svf_data_valid),
-		
-		.req(svf_req),
-		.block_in(svf_block_in),
-		
-		.ack(svf_ack),
-		
-		.slot_alloc_fail(svf_slot_alloc_fail)
-	);
-	`else
-	assign svf_ack = 0;
-	`endif
 	
 	/**********/
 	/* Wiring */
@@ -359,31 +305,12 @@ module dsp_pipeline #(
 	
 	reg [63 : 0] sample_ctr = 0;
 	
-	reg wait_one = 0;
-	
-	wire core_ready;
-
-	wire lut_req;
-	wire [`LUT_HANDLE_WIDTH - 1 : 0] lut_req_handle;
-	wire signed [data_width - 1 : 0] lut_req_arg;
-	wire signed [data_width - 1 : 0] lut_data;
-	wire lut_valid;
+	reg wait_one;
 	
 	wire controller_valid;
 	wire invalid_command;
 	
 	wire block_reg_write;
-	wire invalid_lut_request;
-
-	wire delay_read_req;
-	wire delay_write_req;
-	wire [data_width - 1 : 0] delay_req_handle;
-	wire [data_width - 1 : 0] delay_write_data;
-	wire [data_width - 1 : 0] delay_read_data;
-	wire [data_width - 1 : 0] delay_read_depth;
-	wire [data_width - 1 : 0] delay_read_offset;
-	wire delay_read_valid;
-	wire delay_write_ack;
 	
 	wire invalid_delay_read;
 	wire invalid_delay_write;

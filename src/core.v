@@ -4,6 +4,8 @@
 `include "core.vh"
 `include "lut.vh"
 
+import types_pkg::*;
+
 `default_nettype none
 
 /*
@@ -42,30 +44,26 @@ module dsp_core #(
 		input wire command_reg_1_write,
 		input wire command_instr_write,
 		
-		output reg lut_req,
-		output reg signed [data_width - 1 : 0] lut_handle,
-		output reg signed [data_width - 1 : 0] lut_arg,
-		input wire signed [data_width - 1 : 0] lut_data,
-		input wire lut_valid,
+		input wire delay_req_ack,
+		output rw_req_t delay_req,
+		output wire delay_req_valid,
+		input word_t delay_req_response,
+		input wire delay_req_response_valid,
 		
-		output wire delay_read_req,
-		output wire delay_write_req,
-		output wire signed [data_width - 1 : 0] delay_req_handle,
-		output wire signed [data_width - 1 : 0] delay_write_data,
-		output wire signed [data_width - 1 : 0] delay_write_inc,
-		input  wire signed [data_width - 1 : 0] delay_read_data,
-		output wire 	   [data_width - 1 : 0] delay_read_delay,
-		output wire 	   [data_width - 1 : 0] delay_read_depth,
-		output wire 	   [data_width - 1 : 0] delay_read_offset,
-		input  wire delay_read_valid,
-		input  wire delay_write_ack,
+		output filter_rw_req_t filter_req,
 		
-		output wire filter_calc_req,
-		output wire [7:0] filter_handle_out,
-		output wire signed [data_width - 1 : 0] filter_data_out,
-		input  wire signed [data_width - 1 : 0] filter_data_in,
-		input  wire filter_data_valid,
-		output wire [3:0] filter_req_type,
+		input wire filter_req_ack,
+		output wire filter_req_valid,
+		input wire filter_req_invalid,
+		input word_t filter_req_response,
+		input wire filter_req_response_valid,
+		
+		input wire lut_req_ack,
+		output rw_req_t lut_req,
+		output wire lut_req_valid,
+		output wire lut_req_invalid,
+		input word_t lut_req_response,
+		input wire lut_req_response_valid,
 		
 		input wire reg_writes_commit,
 		output wire regfile_syncing,
@@ -79,22 +77,6 @@ module dsp_core #(
 		output reg data_return_valid,
 		
         input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
-        
-		output wire signed [data_width - 1 : 0] svf_data_out,
-		output wire [data_width - 1 : 0] svf_cutoff_out,
-		output wire [data_width - 1 : 0] svf_d_out,
-		output wire [4 : 0] svf_shift_out,
-	
-		output wire [block_addr_w - 1 : 0] svf_block_out,
-		
-		input wire signed [data_width - 1 : 0] svf_low_in,
-		input wire signed [data_width - 1 : 0] svf_band_in,
-		input wire signed [data_width - 1 : 0] svf_high_in,
-	
-		input wire svf_data_valid,
-		
-		output wire svf_req,
-		input wire svf_ack,
 		
 		output wire [15:0] stuck_flags
 	);
@@ -746,17 +728,11 @@ module dsp_core #(
 		.commit_flag_out(commit_flag_final_stages[`INSTR_BRANCH_MISC])
 	);
 
-	wire  [data_width - 1 : 0] delay_arg_1;
-	wire  [data_width - 1 : 0] delay_arg_2;
-	assign delay_write_data  = delay_arg_1;
-	assign delay_read_delay  = delay_arg_1;
-	assign delay_read_depth  = delay_arg_1;
-	assign delay_read_offset = delay_arg_2;
-
 	/**********/
 	/* Delays */
 	/**********/
-	resource_branch_pulsed #(.data_width(data_width), .handle_width(8), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) delay_stage (
+	
+	rsp_req_str delay_b (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -768,43 +744,39 @@ module dsp_core #(
 		.out_valid(out_valid_final_stages[`INSTR_BRANCH_DELAY]),
 		.out_ready(in_ready_commit_stage[`INSTR_BRANCH_DELAY]),
 		
-		.block_in(block_out_router),
-		.block_out(block_out_final_stages[`INSTR_BRANCH_DELAY]),
+		.block_addr_in(block_out_router),
+		.block_addr_out(block_out_final_stages[`INSTR_BRANCH_DELAY]),
 		
 		.write(writes_external_out_router),
 		
 		.handle_in(res_addr_out_router),
-		.handle_out(delay_req_handle),
 		
 		.arg_a_in(arg_a_out_router),
-		.arg_a_out(delay_arg_1),
 		
 		.arg_b_in(arg_b_out_router),
-		.arg_b_out(delay_arg_2),
 		
 		.dest_in(dest_out_router),
 		.dest_out(dest_final_stages[`INSTR_BRANCH_DELAY]),
 		
-		.read_req(delay_read_req),
-		.write_req(delay_write_req),
+		.req_out(delay_req),
+		.req_ack(delay_req_ack),
+		.req_valid(delay_req_valid),
+		.req_response_in(delay_req_response),
+		.req_response_valid(delay_req_response_valid),
 		
-		.read_valid(delay_read_valid),
-		.write_ack(delay_write_ack),
-		
-		.data_in(delay_read_data),
 		.result_out(result_final_stages[`INSTR_BRANCH_DELAY]),
 		
 		.commit_id_in (commit_id_out_router),
 		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_DELAY]),
 		
-		.flags_in(flags_out_router),
-		.flags_out(flags_out_delay)
+		.flags_in(flags_out_router)
+		//.flags_out(flags_out_delay)
 	);
 
 	/********/
 	/* LUTs */
 	/********/
-	resource_branch #(.data_width(data_width), .handle_width(8), .acc_width(acc_width), .n_channels(n_channels)) lut_stage (
+	rsp_req_str lut_stage (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -816,37 +788,29 @@ module dsp_core #(
 		.out_valid(out_valid_final_stages[`INSTR_BRANCH_LUT]),
 		.out_ready(in_ready_commit_stage[`INSTR_BRANCH_LUT]),
 		
-		.block_in(block_out_router),
-		.block_out(block_out_final_stages[`INSTR_BRANCH_LUT]),
+		.block_addr_in(block_out_router),
+		.block_addr_out(block_out_final_stages[`INSTR_BRANCH_LUT]),
 		
-		.write(0),
 		.handle_in(res_addr_out_router),
-		.handle_out(lut_handle),
 		
 		.arg_a_in(arg_a_out_router),
-		.arg_a_out(lut_arg),
-		
 		.arg_b_in(arg_b_out_router),
-		.arg_b_out(),
-		
-		.read_req(lut_req),
-		.write_req(),
 		
 		.dest_in(dest_out_router),
 		.dest_out(dest_final_stages[`INSTR_BRANCH_LUT]),
 		
-		.read_valid(lut_valid),
-		.data_in(lut_data),
-		
-		.write_ack(1),
+		.req_out(lut_req),
+		.req_ack(lut_req_ack),
+		.req_valid(lut_req_valid),
+		.req_response_in(lut_req_response),
+		.req_response_valid(lut_req_response_valid),
 		
 		.result_out(result_final_stages[`INSTR_BRANCH_LUT]),
 		
 		.commit_id_in(commit_id_out_router),
 		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_LUT]),
 		
-		.flags_in(flags_out_router),
-		.flags_out(flags_out_lut)
+		.flags_in(flags_out_router)
 	);
 	
 	/**********/
@@ -903,9 +867,7 @@ module dsp_core #(
 	/* Filter */
 	/**********/
 	
-	assign svf_data_out = filter_data_out;
-	
-	resource_branch_filter #(.data_width(data_width), .handle_width(8), .acc_width(acc_width), .n_channels(n_channels)) filter_branch (
+	rsp_req_str_filter filter_stage (
 		.clk(clk),
 		.reset(reset | resetting),
 		
@@ -917,54 +879,32 @@ module dsp_core #(
 		.out_valid(out_valid_final_stages[`INSTR_BRANCH_FILT]),
 		.out_ready(in_ready_commit_stage[`INSTR_BRANCH_FILT]),
 		
-		.block_in(block_out_router),
-		.block_out(block_out_final_stages[`INSTR_BRANCH_FILT]),
-		
-		.write(1'b0),
+		.block_addr_in(block_out_router),
+		.block_addr_out(block_out_final_stages[`INSTR_BRANCH_FILT]),
 		
 		.handle_in(res_addr_out_router),
 		
 		.arg_a_in(arg_a_out_router),
-		.arg_a_out(filter_data_out),
-		
 		.arg_b_in(arg_b_out_router),
-		.arg_b_out(svf_cutoff_out),
-		
 		.arg_c_in(arg_c_out_router),
-		.arg_c_out(svf_d_out),
+		.shift_in(shift_out_router),
 		
 		.dest_in(dest_out_router),
 		.dest_out(dest_final_stages[`INSTR_BRANCH_FILT]),
 		
-		.shift_in(shift_out_router),
-		.shift_out(svf_shift_out),
+		.req_out(filter_req),
 		
-		.svf_low_in(svf_low_in),
-		.svf_high_in(svf_high_in),
-		.svf_band_in(svf_band_in),
-		
-		.handle_out(filter_handle_out),
-		
-		.filter_req(filter_calc_req),
-		
-		.req_type_in(flags_out_router),
-		.req_type_out(filter_req_type),
-		
-		.req_id_out(svf_block_out),
-		
-		.data_in(filter_data_in),
-		.data_valid(filter_data_valid),
-		
-		.svf_req(svf_req),
-		.svf_ack(svf_ack),
-		
-		.svf_valid(svf_data_valid),
+		.req_ack(filter_req_ack),
+		.req_valid(filter_req_valid),
+		.req_response_in(filter_req_response),
+		.req_response_valid(filter_req_response_valid),
 		
 		.result_out(result_final_stages[`INSTR_BRANCH_FILT]),
 		
 		.commit_id_in(commit_id_out_router),
-		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_FILT])
+		.commit_id_out(commit_id_final_stages[`INSTR_BRANCH_FILT]),
 		
+		.flags_in(flags_out_router)
 	);
 	
 	/*****************/
