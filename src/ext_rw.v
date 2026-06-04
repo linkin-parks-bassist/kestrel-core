@@ -395,7 +395,7 @@ module rsp_req_str_filter
 		input wire        [data_width - 1 : 0] arg_a_in,
 		input wire        [data_width - 1 : 0] arg_b_in,
 		input wire        [data_width - 1 : 0] arg_c_in,
-		input [3:0] shift_in,
+		input wire [3:0] shift_in,
 		
 		output reg req_valid,
 		output filter_rw_req_t req_out,
@@ -407,7 +407,7 @@ module rsp_req_str_filter
 		input wire [3 : 0] dest_in,
 		output reg [3 : 0] dest_out,
 		
-		output logic        [data_width - 1 : 0] result_out,
+		output reg [data_width - 1 : 0] result_out,
 		
 		input wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
 		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
