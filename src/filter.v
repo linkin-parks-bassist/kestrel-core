@@ -21,7 +21,7 @@ module filter_unit_normal
 		input wire req_valid,
 		input rw_req_t req_in,
 		output reg req_invalid,
-		output logic        [data_width - 1 : 0] req_response,
+		output reg [data_width - 1 : 0] req_response,
 		output reg req_response_valid,
 
         input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
@@ -43,11 +43,11 @@ module filter_unit_normal
 	
 	rw_req_t active_req;
 	
-	logic        [data_width - 1 : 0] req_arg_a = active_req.arg_a;
-	logic        [data_width - 1 : 0] req_arg_b = active_req.arg_b;
-	logic [7 : 0] req_handle = active_req.handle;
-	logic [3:0] req_flags = active_req.flags;
-	logic [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
+	wire [data_width - 1 : 0] req_arg_a = active_req.arg_a;
+	wire [data_width - 1 : 0] req_arg_b = active_req.arg_b;
+	wire [7 : 0] req_handle = active_req.handle;
+	wire [3:0] req_flags = active_req.flags;
+	wire [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
 	
 	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
 	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
@@ -503,12 +503,13 @@ module filter_unit_svf
 		output reg req_invalid,
 		input filter_rw_req_t req_in,
 		
-		output reg 		low_valid,
-		output logic signed [data_width - 1 : 0] low_out,
-		output reg 		band_valid,
-		output logic signed [data_width - 1 : 0] band_out,
-		output reg 		high_valid,
-		output logic signed [data_width - 1 : 0] high_out
+		output reg low_valid,
+		output reg band_valid,
+		output reg high_valid,
+		
+		output reg signed [data_width - 1 : 0] low_out,
+		output reg signed [data_width - 1 : 0] band_out,
+		output reg signed [data_width - 1 : 0] high_out
 	);
 	
 	filter_rw_req_t pending_req;
@@ -525,13 +526,13 @@ module filter_unit_svf
 	
 	filter_rw_req_t active_req;
 	
-	logic        [data_width - 1 : 0] req_arg_a = active_req.arg_a;
-	logic        [data_width - 1 : 0] req_arg_b = active_req.arg_b;
-	logic        [data_width - 1 : 0] req_arg_c = active_req.arg_c;
-	logic        [data_width - 1 : 0] req_shift = active_req.shift;
-	logic [7 : 0] req_handle = active_req.handle;
-	logic [3:0] req_flags = active_req.flags;
-	logic [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
+	wire        [data_width - 1 : 0] req_arg_a = active_req.arg_a;
+	wire        [data_width - 1 : 0] req_arg_b = active_req.arg_b;
+	wire        [data_width - 1 : 0] req_arg_c = active_req.arg_c;
+	wire        [data_width - 1 : 0] req_shift = active_req.shift;
+	wire [7 : 0] req_handle = active_req.handle;
+	wire [3:0] req_flags = active_req.flags;
+	wire [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
 	
 	localparam handle_addr_width = $clog2(`N_SVF);
 	
@@ -761,7 +762,7 @@ module filter_master
 		input wire req_valid,
 		input filter_rw_req_t req_in,
 		output reg req_invalid,
-		output logic        [data_width - 1 : 0] req_response,
+		output reg [data_width - 1 : 0] req_response,
 		output reg req_response_valid,
 
         input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
@@ -790,17 +791,17 @@ module filter_master
 	
 	filter_rw_req_t active_req;
 	
-	logic        [data_width - 1 : 0] req_arg_a = active_req.arg_a;
-	logic        [data_width - 1 : 0] req_arg_b = active_req.arg_b;
-	logic [7 : 0] req_handle = active_req.handle;
-	logic [3:0] req_flags = active_req.flags;
-	logic [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
+	wire [data_width - 1 : 0] req_arg_a = active_req.arg_a;
+	wire [data_width - 1 : 0] req_arg_b = active_req.arg_b;
+	wire [7 : 0] req_handle = active_req.handle;
+	wire [3:0] req_flags = active_req.flags;
+	wire [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
 
 	wire filter_req_ack;
 	reg  filter_req_valid;
 	rw_req_t filter_req_in;
 	wire filter_req_invalid;
-	logic        [data_width - 1 : 0] filter_req_response;
+	reg [data_width - 1 : 0] filter_req_response;
 	wire filter_req_response_valid;
 	wire filter_stuck;
 	
@@ -840,9 +841,9 @@ module filter_master
 	wire svf_band_valid;
 	wire svf_high_valid;
 	
-	logic signed [data_width - 1 : 0] svf_low_out;
-	logic signed [data_width - 1 : 0] svf_band_out;
-	logic signed [data_width - 1 : 0] svf_high_out;
+	wire signed [data_width - 1 : 0] svf_low_out;
+	wire signed [data_width - 1 : 0] svf_band_out;
+	wire signed [data_width - 1 : 0] svf_high_out;
 	
 	filter_unit_svf svfs (
 			.clk(clk),

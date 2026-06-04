@@ -28,4 +28,4 @@
 
 `define BLOCK_ADDR_W $clog2(`N_BLOCKS)
 
-//`define DEBUG_READS
+`define DEBUG_READS

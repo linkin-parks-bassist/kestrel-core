@@ -14,8 +14,8 @@ module commit_master #(parameter integer data_width, parameter n_blocks = 256, p
 		input wire sample_tick,
 		input wire signed [data_width - 1 : 0] sample_in,
 		
-		input wire   [`N_INSTR_BRANCHES - 1 : 0] in_valid,
-		output logic [`N_INSTR_BRANCHES - 1 : 0] in_ready,
+		input  wire [`N_INSTR_BRANCHES - 1 : 0] in_valid,
+		output wire [`N_INSTR_BRANCHES - 1 : 0] in_ready,
 		
 		input wire [$clog2(n_blocks)  - 1 : 0] block_in		[`N_INSTR_BRANCHES - 1 : 0],
 		input wire signed [data_width - 1 : 0] result		[`N_INSTR_BRANCHES - 1 : 0],

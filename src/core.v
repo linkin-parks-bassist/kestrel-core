@@ -47,7 +47,7 @@ module dsp_core #(
 		input wire delay_req_ack,
 		output rw_req_t delay_req,
 		output wire delay_req_valid,
-		input logic [data_width - 1 : 0] delay_req_response,
+		input wire [data_width - 1 : 0] delay_req_response,
 		input wire delay_req_response_valid,
 		
 		output filter_rw_req_t filter_req,
@@ -55,14 +55,14 @@ module dsp_core #(
 		input wire filter_req_ack,
 		output wire filter_req_valid,
 		input wire filter_req_invalid,
-		input logic [data_width - 1 : 0] filter_req_response,
+		input wire [data_width - 1 : 0] filter_req_response,
 		input wire filter_req_response_valid,
 		
 		input wire lut_req_ack,
 		output rw_req_t lut_req,
 		output wire lut_req_valid,
 		output wire lut_req_invalid,
-		input logic [data_width - 1 : 0] lut_req_response,
+		input wire [data_width - 1 : 0] lut_req_response,
 		input wire lut_req_response_valid,
 		
 		input wire reg_writes_commit,

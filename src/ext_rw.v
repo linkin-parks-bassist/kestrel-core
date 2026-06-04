@@ -275,29 +275,29 @@ module rsp_req_str
 		output wire out_valid,
 		input  wire out_ready,
 		
-		input  logic [`BLOCK_ADDR_W - 1 : 0] block_addr_in,
-		output logic [`BLOCK_ADDR_W - 1 : 0] block_addr_out,
+		input wire [`BLOCK_ADDR_W - 1 : 0] block_addr_in,
+		output reg [`BLOCK_ADDR_W - 1 : 0] block_addr_out,
 		
 		input wire write,
-		input logic [7 : 0] handle_in,
+		input wire [7 : 0] handle_in,
 		
-		input logic        [data_width - 1 : 0] arg_a_in,
-		input logic        [data_width - 1 : 0] arg_b_in,
+		input wire [data_width - 1 : 0] arg_a_in,
+		input wire [data_width - 1 : 0] arg_b_in,
 		
 		output reg req_valid,
 		output rw_req_t req_out,
 		
 		input wire req_ack,
 		input wire req_response_valid,
-		input logic        [data_width - 1 : 0] req_response_in,
+		input wire [data_width - 1 : 0] req_response_in,
 		
-		input  logic [3 : 0] dest_in,
-		output logic [3 : 0] dest_out,
+		input wire [3 : 0] dest_in,
+		output reg [3 : 0] dest_out,
 		
-		output logic        [data_width - 1 : 0] result_out,
+		output reg [data_width - 1 : 0] result_out,
 		
-		input  logic [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
-		output logic [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
+		input wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
+		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
 		
 		input wire [3:0] flags_in
 	);
@@ -306,9 +306,9 @@ module rsp_req_str
 	assign in_ready  = (state == IDLE);
 	assign out_valid = (state == DONE);
 	
-	logic [`BLOCK_ADDR_W - 1 : 0]   block_latched;
-	logic [`COMMIT_ID_WIDTH - 1 : 0]    commit_id_latched;
-	logic [3 : 0] dest_latched;
+	reg [`BLOCK_ADDR_W - 1 : 0]   block_latched;
+	reg [`COMMIT_ID_WIDTH - 1 : 0]    commit_id_latched;
+	reg [3 : 0] dest_latched;
 	
 	reg write_latched;
 	
@@ -386,15 +386,15 @@ module rsp_req_str_filter
 		output wire out_valid,
 		input  wire out_ready,
 		
-		input  logic [`BLOCK_ADDR_W - 1 : 0] block_addr_in,
-		output logic [`BLOCK_ADDR_W - 1 : 0] block_addr_out,
+		input wire [`BLOCK_ADDR_W - 1 : 0] block_addr_in,
+		output reg [`BLOCK_ADDR_W - 1 : 0] block_addr_out,
 		
 		input wire write,
-		input logic [7 : 0] handle_in,
+		input wire [7 : 0] handle_in,
 		
-		input logic        [data_width - 1 : 0] arg_a_in,
-		input logic        [data_width - 1 : 0] arg_b_in,
-		input logic        [data_width - 1 : 0] arg_c_in,
+		input wire        [data_width - 1 : 0] arg_a_in,
+		input wire        [data_width - 1 : 0] arg_b_in,
+		input wire        [data_width - 1 : 0] arg_c_in,
 		input [3:0] shift_in,
 		
 		output reg req_valid,
@@ -402,15 +402,15 @@ module rsp_req_str_filter
 		
 		input wire req_ack,
 		input wire req_response_valid,
-		input logic        [data_width - 1 : 0] req_response_in,
+		input wire [data_width - 1 : 0] req_response_in,
 		
-		input  logic [3 : 0] dest_in,
-		output logic [3 : 0] dest_out,
+		input wire [3 : 0] dest_in,
+		output reg [3 : 0] dest_out,
 		
 		output logic        [data_width - 1 : 0] result_out,
 		
-		input  logic [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
-		output logic [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
+		input wire [`COMMIT_ID_WIDTH - 1 : 0] commit_id_in,
+		output reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_out,
 		
 		input wire [3:0] flags_in
 	);
@@ -419,9 +419,9 @@ module rsp_req_str_filter
 	assign in_ready  = (state == IDLE);
 	assign out_valid = (state == DONE);
 	
-	logic [`BLOCK_ADDR_W - 1 : 0]   block_latched;
-	logic [`COMMIT_ID_WIDTH - 1 : 0]    commit_id_latched;
-	logic [3 : 0] dest_latched;
+	reg [`BLOCK_ADDR_W    - 1 : 0]   block_latched;
+	reg [`COMMIT_ID_WIDTH - 1 : 0] commit_id_latched;
+	reg [3 : 0] dest_latched;
 	
 	reg write_latched;
 	

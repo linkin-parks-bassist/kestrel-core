@@ -258,12 +258,12 @@ module dsp_pipeline #(
 	wire filter_req_ack;
 	wire filter_req_valid;
 	wire filter_req_invalid;
-	logic        [data_width - 1 : 0] filter_req_response;
+	wire        [data_width - 1 : 0] filter_req_response;
 	wire filter_req_response_valid;
 	
-	logic        [data_width - 1 : 0] svf_req_response_low;
-	logic        [data_width - 1 : 0] svf_req_response_band;
-	logic        [data_width - 1 : 0] svf_req_response_high;
+	wire        [data_width - 1 : 0] svf_req_response_low;
+	wire        [data_width - 1 : 0] svf_req_response_band;
+	wire        [data_width - 1 : 0] svf_req_response_high;
 	
 	filter_master filters (
 		.clk(clk),
