@@ -176,7 +176,7 @@ module dsp_pipeline #(
 	wire lut_req_ack;
 	wire lut_req_valid;
 	wire lut_req_invalid;
-	word_t lut_req_response;
+	logic        [data_width - 1 : 0] lut_req_response;
 	wire lut_req_response_valid;
 	`else
 	assign lut_valid = 0;
@@ -194,7 +194,7 @@ module dsp_pipeline #(
 	wire delay_req_ack;
 	wire delay_req_valid;
 	wire delay_req_invalid;
-	word_t delay_req_response;
+	logic        [data_width - 1 : 0] delay_req_response;
 	wire delay_req_response_valid;
     
 	delay_master #(
@@ -258,12 +258,12 @@ module dsp_pipeline #(
 	wire filter_req_ack;
 	wire filter_req_valid;
 	wire filter_req_invalid;
-	word_t filter_req_response;
+	logic        [data_width - 1 : 0] filter_req_response;
 	wire filter_req_response_valid;
 	
-	word_t svf_req_response_low;
-	word_t svf_req_response_band;
-	word_t svf_req_response_high;
+	logic        [data_width - 1 : 0] svf_req_response_low;
+	logic        [data_width - 1 : 0] svf_req_response_band;
+	logic        [data_width - 1 : 0] svf_req_response_high;
 	
 	filter_master filters (
 		.clk(clk),

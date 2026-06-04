@@ -47,7 +47,7 @@ module dsp_core #(
 		input wire delay_req_ack,
 		output rw_req_t delay_req,
 		output wire delay_req_valid,
-		input word_t delay_req_response,
+		input logic [data_width - 1 : 0] delay_req_response,
 		input wire delay_req_response_valid,
 		
 		output filter_rw_req_t filter_req,
@@ -55,14 +55,14 @@ module dsp_core #(
 		input wire filter_req_ack,
 		output wire filter_req_valid,
 		input wire filter_req_invalid,
-		input word_t filter_req_response,
+		input logic [data_width - 1 : 0] filter_req_response,
 		input wire filter_req_response_valid,
 		
 		input wire lut_req_ack,
 		output rw_req_t lut_req,
 		output wire lut_req_valid,
 		output wire lut_req_invalid,
-		input word_t lut_req_response,
+		input logic [data_width - 1 : 0] lut_req_response,
 		input wire lut_req_response_valid,
 		
 		input wire reg_writes_commit,
@@ -130,12 +130,12 @@ module dsp_core #(
 	
 	reg [31 : 0] instrs [n_blocks - 1 : 0];
 	
-	reg [block_addr_w - 1 : 0] last_block;
-	reg [block_addr_w     : 0] n_blocks_running;
+	reg [`BLOCK_ADDR_W - 1 : 0] last_block;
+	reg [`BLOCK_ADDR_W     : 0] n_blocks_running;
 	
-	reg  [block_addr_w - 1 : 0] block_read_addr_prev;
-	wire [block_addr_w - 1 : 0] block_read_addr  = block_read_addr_bfds;
-	wire [block_addr_w - 1 : 0] instr_write_addr = (resetting) ? blk_reset_ctr : command_block_target;
+	reg  [`BLOCK_ADDR_W - 1 : 0] block_read_addr_prev;
+	wire [`BLOCK_ADDR_W - 1 : 0] block_read_addr  = block_read_addr_bfds;
+	wire [`BLOCK_ADDR_W - 1 : 0] instr_write_addr = (resetting) ? blk_reset_ctr : command_block_target;
 	reg  [31 			   : 0] instr_read_val;
 	wire [31 			   : 0] instr_write_val  = (resetting) ? 0 : command_instr_write_val;
 	
@@ -199,7 +199,7 @@ module dsp_core #(
 	
 	reg  [`CTRL_DATA_BUS_WIDTH - 1 : 0] data_req_ctrl_data_r;
 	wire [7:0] data_req_type = data_req_ctrl_data_r[7:0];
-	wire [block_addr_w 	- 1 : 0] block_data_req_addr;
+	wire [`BLOCK_ADDR_W 	- 1 : 0] block_data_req_addr;
 	wire [mem_addr_w 	- 1 : 0] mem_data_req_addr;
 	wire [7 : 0] block_data_req_reg;
 	
@@ -332,7 +332,7 @@ module dsp_core #(
 	
 	assign regfile_syncing = regfile_syncing_b | regfile_syncing_a;
 
-	wire [block_addr_w - 1 : 0] reg_read_addr = (command_reg_0_write | command_reg_1_write) ? command_block_target : block_read_addr;
+	wire [`BLOCK_ADDR_W - 1 : 0] reg_read_addr = (command_reg_0_write | command_reg_1_write) ? command_block_target : block_read_addr;
 	
 	wire signed [data_width - 1 : 0] register_0_read_value = (active_regfile) ? register_0_read_b : register_0_read_a;
 	wire signed [data_width - 1 : 0] register_1_read_value = (active_regfile) ? register_1_read_b : register_1_read_a;

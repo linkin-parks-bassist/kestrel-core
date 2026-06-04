@@ -24,7 +24,7 @@ module lut_master #(parameter integer data_width) (
 		input wire req_valid,
 		input rw_req_t req_in,
 		output reg req_invalid,
-		output word_t req_response,
+		output logic        [data_width - 1 : 0] req_response,
 		output reg req_response_valid
 		
 	);
@@ -43,11 +43,11 @@ module lut_master #(parameter integer data_width) (
 	
 	rw_req_t active_req;
 	
-	word_t req_arg_a = active_req.arg_a;
-	word_t req_arg_b = active_req.arg_b;
-	handle_t req_handle = active_req.handle;
+	logic        [data_width - 1 : 0] req_arg_a = active_req.arg_a;
+	logic        [data_width - 1 : 0] req_arg_b = active_req.arg_b;
+	logic [7 : 0] req_handle = active_req.handle;
 	logic [3:0] req_flags = active_req.flags;
-	block_addr_t req_block = active_req.block;
+	logic [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
 	
 	reg [7:0] state = `LUT_MASTER_STATE_READY;
 	

@@ -1,5 +1,6 @@
 `define SAMPLE_IO_WIDTH 	16
 `define SAMPLE_WIDTH 		16
+`define DATA_WIDTH	 		16
 `define FILTER_COEF_WIDTH	18
 `define N_BLOCKS			256
 
@@ -12,9 +13,9 @@
 `define ENABLE_SVF
 `define ENABLE_LUTS
 
-`define N_FILTERS 8
-`define N_DELAYS  8
-`define N_SVF	  8
+`define N_FILTERS 16
+`define N_DELAYS  16
+`define N_SVF	  16
 
 `define FILTER_MEM_SIZE 128
 `define SVF_MEM_SIZE 128
@@ -24,5 +25,7 @@
 `define GAIN_FORMAT 5
 
 `define COMMIT_ID_WIDTH 6
+
+`define BLOCK_ADDR_W $clog2(`N_BLOCKS)
 
 //`define DEBUG_READS
