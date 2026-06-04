@@ -50,13 +50,17 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 	localparam signed [data_width - 1 : 0] tail_close_velocity 		= unity_gain >> 9;
 	localparam signed [data_width - 1 : 0] tail_envelope_threshold 	= 1 << 4;
 	
-	localparam [2:0] TAIL_SWAP_RAMP  = 3'd0;
-	localparam [2:0] TAIL_SWAP_DECAY = 3'd1;
-	localparam [2:0] TAIL_SWAP_CLOSE = 3'd2;
+	localparam [2:0] NO_SWAP  		 = 3'd0;
+	localparam [2:0] CROSSFADE 		 = 3'd1;
+	localparam [2:0] TAIL_SWAP_RAMP  = 3'd2;
+	localparam [2:0] TAIL_SWAP_DECAY = 3'd3;
+	localparam [2:0] TAIL_SWAP_CLOSE = 3'd4;
 	
 	reg swap_tail_enable_r;
 	reg [ 2:0] swap_tail_enable_state;
 	reg [63:0] swap_tail_enable_ctr;
+	
+	reg [2:0] swap_state;
 	
 	reg current_pipeline_r;
 	
@@ -66,15 +70,18 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 	reg signed [data_width - 1 : 0] envelope_a_r;
 	reg signed [data_width - 1 : 0] envelope_b_r;
 	
+	reg signed [data_width - 1 : 0] out_sample_0_r;
+	reg signed [data_width - 1 : 0] out_sample_1_r;
+	
 	reg signed [data_width - 1 : 0] envelopes_r;
 	
 	assign envelopes_r[0] = envelope_a_r;
 	assign envelopes_r[1] = envelope_b_r;
 	
 	envelope_follower #(.data_width(data_width)) env_a
-		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_samples[0]), .sample_valid(tick), .envelope(envelopes[0]), .envelope_valid(envelope_valids[0]));
+		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_sample_0_r), .sample_valid(tick), .envelope(envelopes[0]), .envelope_valid(envelope_valids[0]));
 	envelope_follower #(.data_width(data_width)) env_b
-		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_samples[1]), .sample_valid(tick), .envelope(envelopes[1]), .envelope_valid(envelope_valids[1]));
+		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_sample_1_r), .sample_valid(tick), .envelope(envelopes[1]), .envelope_valid(envelope_valids[1]));
 	
 	always @(posedge clk) begin
 	
@@ -83,14 +90,19 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 		
 		if (swap_pipelines) begin
 			pipelines_swapping <= 1;
-			swap_tail_enable_r <= swap_tail_enable;
 			
-			swap_tail_enable_state <= TAIL_SWAP_RAMP;
+			if (swap_tail_enable)
+				swap_state <= TAIL_SWAP_RAMP;
+			else
+				swap_state <= CROSSFADE;
+			
 			swap_tail_enable_ctr <= 0;
 		end
 		
 		if (envelope_valids[0])	envelope_a_r <= envelopes[0];
-		if (envelope_valids[1])	envelope_b_r <= envelopes[1];
+		if (envelope_valids[1])	envelope_b_r <= envelopes[1];		
+	
+		current_pipeline_r <= current_pipeline;
 		
 		if (reset) begin
 			input_gain     <= 0;
@@ -102,60 +114,70 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 			output_gains[1] <= 0;
 			
 			pipelines_swapping <= 0;
-			swap_tail_enable_r <= 0;
+			swap_state <= NO_SWAP;
+			
+			out_sample_0_r <= 0;
+			out_sample_1_r <= 0;
+			
+			envelope_a_r <= 0;
+			envelope_b_r <= 0;
 		end else if (tick) begin
-			
-			current_pipeline_r <= current_pipeline;
-			
-			if (pipelines_swapping) begin
-				if (swap_tail_enable_r) begin
-					case (swap_tail_enable_state)
-						TAIL_SWAP_RAMP: begin
-							if (input_gains[current_pipeline_r] == 0) begin
-								swap_tail_enable_state <= TAIL_SWAP_DECAY;
-								output_gains[~current_pipeline_r] <= unity_gain;
-							end else begin
-								input_gains [ current_pipeline_r] <=  input_gains[ current_pipeline_r] - switch_velocity;
-								output_gains[~current_pipeline_r] <= output_gains[~current_pipeline_r] + switch_velocity;
-							end
-						end
-						
-						TAIL_SWAP_DECAY: begin
-							swap_tail_enable_ctr <= swap_tail_enable_ctr + 1;
-							
-							if (output_gains[current_pipeline_r] == 0) begin
-								swap_tail_enable_state <= TAIL_SWAP_CLOSE;
-							end else begin
-								if (swap_tail_enable_ctr[5:0] == 6'b0)
-									output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - 1;
-								
-								if (envelopes_r[current_pipeline_r] < tail_envelope_threshold) begin
-									swap_tail_enable_state <= TAIL_SWAP_CLOSE;
-								end
-							end
-						end
-						
-						TAIL_SWAP_CLOSE: begin
-							output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - tail_close_velocity;
-							
-							if ($signed(output_gains[current_pipeline_r] - tail_close_velocity) <= 0) begin
-								input_gains [current_pipeline_r] <= unity_gain;
-								output_gains[current_pipeline_r] <= 0;
-								pipelines_swapping <= 0;
-							end
-						end
-					endcase
-				end else begin
+			out_sample_0_r <= out_samples[0];
+			out_sample_1_r <= out_samples[1];
+		
+			case (swap_state)
+				NO_SWAP: begin
+				
+				end
+				
+				CROSSFADE: begin
 					if (output_gains[ current_pipeline_r] == 0) begin
 						output_gains[~current_pipeline_r] <= unity_gain;
 						pipelines_swapping <= 0;
+						swap_state <= NO_SWAP;
 					end
 					else begin
 						output_gains[ current_pipeline_r] <= output_gains[ current_pipeline_r] - switch_velocity;
 						output_gains[~current_pipeline_r] <= output_gains[~current_pipeline_r] + switch_velocity;
 					end
 				end
-			end
+				
+				TAIL_SWAP_RAMP: begin
+					if (input_gains[current_pipeline_r] == 0) begin
+						output_gains[~current_pipeline_r] <= unity_gain;
+						swap_state <= TAIL_SWAP_DECAY;
+					end else begin
+						input_gains [ current_pipeline_r] <=  input_gains[ current_pipeline_r] - switch_velocity;
+						output_gains[~current_pipeline_r] <= output_gains[~current_pipeline_r] + switch_velocity;
+					end
+				end
+				
+				TAIL_SWAP_DECAY: begin
+					swap_tail_enable_ctr <= swap_tail_enable_ctr + 1;
+					
+					if (output_gains[current_pipeline_r] == 0) begin
+						swap_state <= TAIL_SWAP_CLOSE;
+					end else begin
+						if (swap_tail_enable_ctr[5:0] == 6'b0)
+							output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - 1;
+						
+						if (envelopes_r[current_pipeline_r] < tail_envelope_threshold) begin
+							swap_state <= TAIL_SWAP_CLOSE;
+						end
+					end
+				end
+				
+				TAIL_SWAP_CLOSE: begin
+					output_gains[current_pipeline_r] <= output_gains[current_pipeline_r] - tail_close_velocity;
+					
+					if ($signed(output_gains[current_pipeline_r] - tail_close_velocity) <= 0) begin
+						input_gains [current_pipeline_r] <= unity_gain;
+						output_gains[current_pipeline_r] <= 0;
+						pipelines_swapping <= 0;
+						swap_state <= NO_SWAP;
+					end
+				end
+			endcase
 		end
 	end
 endmodule
@@ -247,153 +269,6 @@ module bimultiplier #(parameter integer data_width, parameter format = 0)
 			factor_2 <= y;
 			coef_1 <= a;
 			coef_2 <= b;
-		end
-	end
-	
-endmodule
-
-module mixer #(parameter integer data_width, parameter gain_format = 4)
-	(
-		input wire clk,
-		input wire reset,
-
-		input  wire signed [data_width - 1 : 0] in_sample,
-		output wire signed [data_width - 1 : 0] in_sample_out_a,
-		output wire signed [data_width - 1 : 0] in_sample_out_b,
-		
-		input wire signed [data_width - 1 : 0] out_sample_in_a,
-		input wire signed [data_width - 1 : 0] out_sample_in_b,
-		
-		output reg signed [data_width - 1 : 0] out_sample,
-		
-		input wire [data_width - 1 : 0] data_in,
-		
-		input wire in_sample_valid,
-		input wire out_samples_valid,
-		
-		output wire in_sample_mixed,
-		output reg  out_sample_valid,
-		
-		input wire set_input_gain,
-		input wire set_output_gain,
-		
-		input wire swap_pipelines,
-		input wire swap_tail_enable,
-		
-		output wire pipelines_swapping,
-		input  wire current_pipeline
-	);
-	
-	wire signed [data_width - 1 : 0] input_gain;
-	wire signed [data_width - 1 : 0] input_gains [1:0];
-	
-	wire signed [data_width - 1 : 0] output_gain;
-	wire signed [data_width - 1 : 0] output_gains [1:0];
-	
-	wire signed [data_width - 1 : 0] out_samples_in [1:0];
-	assign out_samples_in[0] = out_sample_in_a;
-	assign out_samples_in[1] = out_sample_in_b;
-	
-	gain_controller #(.data_width(data_width), .gain_format(gain_format)) gain_ctrl
-		(
-			.clk(clk),
-			.reset(reset),
-
-			.tick(out_sample_valid),
-
-			.set_input_gain(set_input_gain),
-			.set_output_gain(set_output_gain),
-			.data_in(data_in),
-			
-			.input_gain(input_gain),
-			.input_gains(input_gains),
-			
-			.output_gain(output_gain),
-			.output_gains(output_gains),
-			
-			.out_samples(out_samples_in),
-			
-			.swap_pipelines(swap_pipelines),
-			.swap_tail_enable(swap_tail_enable),
-			
-			.pipelines_swapping(pipelines_swapping),
-			
-			.current_pipeline(current_pipeline)
-		);
-	
-	wire output_gain_valid;
-	
-	bimultiplier #(.data_width(data_width), .format(gain_format)) input_gain_applier
-		(
-			.clk(clk),
-			.reset(reset),
-
-			.x(in_sample),
-			.y(in_sample),
-
-			.a(input_gain),
-			.b(input_gain),
-			.c(input_gains[0]),
-			.d(input_gains[1]),
-
-			.in_valid(in_sample_valid),
-
-			.out_1(in_sample_out_a),
-			.out_2(in_sample_out_b),
-
-			.out_valid(in_sample_mixed)
-		);
-	
-	wire signed [data_width - 1 : 0] out_sample_a_amp;
-	wire signed [data_width - 1 : 0] out_sample_b_amp;
-	
-	bimultiplier #(.data_width(data_width), .format(gain_format)) output_gain_applier
-		(
-			.clk(clk),
-			.reset(reset),
-
-			.x(out_sample_in_a),
-			.y(out_sample_in_b),
-
-			.a(output_gains[0]),
-			.b(output_gains[1]),
-			.c(output_gain),
-			.d(output_gain),
-
-			.in_valid(out_samples_valid),
-
-			.out_1(out_sample_a_amp),
-			.out_2(out_sample_b_amp),
-
-			.out_valid(output_gain_valid)
-		);
-	
-	
-	localparam signed [data_width : 0] sat_max = ( 1 << (data_width - 1)) - 1;
-	localparam signed [data_width : 0] sat_min = (-1 << (data_width - 1));
-	
-	localparam signed sat_max_t = sat_max[data_width - 1 : 0];
-	localparam signed sat_min_t = sat_min[data_width - 1 : 0];
-	
-	reg  signed [data_width     : 0] out_sum;
-	wire signed [data_width - 1 : 0] out_sum_t = out_sum[data_width - 1 : 0];
-	wire signed [data_width - 1 : 0] out_sum_sat = (out_sum > sat_max) ? sat_max_t : ((out_sum < sat_min) ? sat_min_t : out_sum_t);
-	
-	reg out_sum_valid;
-	
-	always @(posedge clk) begin
-		out_sum <= out_sample_a_amp + out_sample_b_amp;
-		out_sum_valid <= output_gain_valid;
-		
-		out_sample_valid <= 0;
-		
-		if (reset) begin
-			out_sum_valid <= 0;
-		end else begin
-			if (out_sum_valid) begin
-				out_sample <= out_sum_sat;
-				out_sample_valid <= 1;
-			end
 		end
 	end
 	
