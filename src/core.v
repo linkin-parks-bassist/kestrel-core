@@ -40,46 +40,64 @@ module dsp_core #(
 		
 		output reg ready,
 		
+        input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
+        
 		input wire command_reg_0_write,
 		input wire command_reg_1_write,
 		input wire command_instr_write,
-		
-		input wire delay_req_ack,
-		output rw_req_t delay_req,
-		output wire delay_req_valid,
-		input wire [data_width - 1 : 0] delay_req_response,
-		input wire delay_req_response_valid,
-		
-		output filter_rw_req_t filter_req,
-		
-		input wire filter_req_ack,
-		output wire filter_req_valid,
-		input wire filter_req_invalid,
-		input wire [data_width - 1 : 0] filter_req_response,
-		input wire filter_req_response_valid,
-		
-		input wire lut_req_ack,
-		output rw_req_t lut_req,
-		output wire lut_req_valid,
-		output wire lut_req_invalid,
-		input wire [data_width - 1 : 0] lut_req_response,
-		input wire lut_req_response_valid,
-		
 		input wire reg_writes_commit,
-		output wire regfile_syncing,
+		input wire data_req,
 		
 		input wire full_reset,
-		output reg resetting,
 		
-		input wire data_req,
+		output rw_req_t delay_req,
+		input  wire delay_req_ack,
+		output wire delay_req_valid,
+		input  wire delay_req_invalid,
+		input  wire delay_req_response_valid,
+		input  wire [data_width - 1 : 0] delay_req_response,
+		
+		output filter_rw_req_t filter_req,
+		input  wire filter_req_ack,
+		output wire filter_req_valid,
+		output wire filter_req_invalid,
+		input  wire filter_req_response_valid,
+		input  wire [data_width - 1 : 0] filter_req_response,
+		
+		output rw_req_t lut_req,
+		input  wire lut_req_ack,
+		output wire lut_req_valid,
+		input  wire lut_req_invalid,
+		input  wire lut_req_response_valid,
+		input  wire [data_width - 1 : 0] lut_req_response,
+		
+		output wire regfile_syncing,
+		
+		output reg resetting,
 		
 		output reg [31:0] data_return,
 		output reg data_return_valid,
 		
-        input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
-		
 		output wire [15:0] stuck_flags
 	);
+
+	reg [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in_r;
+
+	reg command_reg_0_write_r;
+	reg command_reg_1_write_r;
+	reg command_instr_write_r;
+	reg reg_writes_commit_r;
+	reg data_req_r;
+	
+	always @(posedge clk) begin
+		ctrl_data_in_r <= ctrl_data_in;
+
+		command_reg_0_write_r <= command_reg_0_write;
+		command_reg_1_write_r <= command_reg_1_write;
+		command_instr_write_r <= command_instr_write;
+		reg_writes_commit_r   <= reg_writes_commit;
+		data_req_r 			  <= data_req;
+	end
 	
 	wire stuck_bfds;
 	wire stuck_ofs;
@@ -96,11 +114,11 @@ module dsp_core #(
 	wire [31 : 0] command_instr_write_val;
 	wire signed [data_width - 1 : 0] command_reg_write_val;
 	
-	assign command_instr_write_val = ctrl_data_in[31 : 0];
-	assign command_block_target =  (command_instr_write) ? ctrl_data_in[$clog2(n_blocks) + 32 - 1 : 32]
-														 : ctrl_data_in[$clog2(n_blocks) + data_width - 1 : data_width];
-	assign command_reg_write_val = ctrl_data_in[data_width - 1 : 0];
-	assign command_reg_target  	 = command_reg_1_write;
+	assign command_instr_write_val = ctrl_data_in_r[31 : 0];
+	assign command_block_target =  (command_instr_write_r) ? ctrl_data_in_r[$clog2(n_blocks) + 32 - 1 : 32]
+														 : ctrl_data_in_r[$clog2(n_blocks) + data_width - 1 : data_width];
+	assign command_reg_write_val = ctrl_data_in_r[data_width - 1 : 0];
+	assign command_reg_target  	 = command_reg_1_write_r;
 	
 	reg enable_req_r;
 	reg enable_core;
@@ -139,7 +157,7 @@ module dsp_core #(
 	reg  [31 			   : 0] instr_read_val;
 	wire [31 			   : 0] instr_write_val  = (resetting) ? 0 : command_instr_write_val;
 	
-	wire instr_write_enable = (resetting) ? 1 : command_instr_write;
+	wire instr_write_enable = (resetting) ? 1 : command_instr_write_r;
 	
 	reg signed [data_width - 1 : 0] channels [n_channels - 1 : 0];
 	
@@ -213,8 +231,8 @@ module dsp_core #(
 		if (reset | resetting) begin
 			data_req_active <= 0;
 		end else begin
-			if (data_req) begin
-				data_req_ctrl_data_r <= ctrl_data_in;
+			if (data_req_r) begin
+				data_req_ctrl_data_r <= ctrl_data_in_r;
 				data_req_active <= 1;
 			end else if (data_req_active) begin
 				case (data_req_type)
@@ -288,7 +306,7 @@ module dsp_core #(
 		.write_addr(command_block_target),
 		.write_value(command_reg_write_val),
 		.write_select(command_reg_target),
-		.write_enable((command_reg_0_write | command_reg_1_write) & active_regfile == 1),
+		.write_enable((command_reg_0_write_r | command_reg_1_write_r) & active_regfile == 1),
 		
 		.registers_packed_out(register_read_packed_a),
 		.register_0_out(register_0_read_a),
@@ -318,7 +336,7 @@ module dsp_core #(
 		.write_addr(command_block_target),
 		.write_value(command_reg_write_val),
 		.write_select(command_reg_target),
-		.write_enable((command_reg_0_write | command_reg_1_write) & active_regfile == 0),
+		.write_enable((command_reg_0_write_r | command_reg_1_write_r) & active_regfile == 0),
 		
 		.registers_packed_out(register_read_packed_b),
 		.register_0_out(register_0_read_b),
@@ -332,7 +350,7 @@ module dsp_core #(
 	
 	assign regfile_syncing = regfile_syncing_b | regfile_syncing_a;
 
-	wire [`BLOCK_ADDR_W - 1 : 0] reg_read_addr = (command_reg_0_write | command_reg_1_write) ? command_block_target : block_read_addr;
+	wire [`BLOCK_ADDR_W - 1 : 0] reg_read_addr = (command_reg_0_write_r | command_reg_1_write_r) ? command_block_target : block_read_addr;
 	
 	wire signed [data_width - 1 : 0] register_0_read_value = (active_regfile) ? register_0_read_b : register_0_read_a;
 	wire signed [data_width - 1 : 0] register_1_read_value = (active_regfile) ? register_1_read_b : register_1_read_a;
@@ -345,7 +363,7 @@ module dsp_core #(
 		
 		if (reset) begin
 			active_regfile <= 0;
-		end else if (reg_writes_commit) begin
+		end else if (reg_writes_commit_r) begin
 			if (active_regfile == 0) begin
 				regfile_sync_a <= 1;
 			end else if (active_regfile == 1) begin

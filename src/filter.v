@@ -553,7 +553,7 @@ module filter_unit_svf
 	
 	reg [handle_addr_width - 1 : 0] n_slots_used;
 	
-	logic signed [data_width - 1 : 0] arg_a_pending = pending_req.arg_a;
+	wire signed [data_width - 1 : 0] arg_a_pending = pending_req.arg_a;
 	
 	reg signed [math_width - 1 : 0] data_in_r;
 	reg signed [math_width - 1 : 0] cutoff_in_r;
@@ -937,8 +937,8 @@ module filter_master
 				if (pending_target_svf) begin
 					busy <= 1;
 					
-					if (req_in.flags == `FILTER_REQ_TYPE_SVF) begin
-						svf_req_in <= req_in;
+					if (pending_req.flags == `FILTER_REQ_TYPE_SVF) begin
+						svf_req_in <= pending_req;
 						svf_req_valid <= 1;
 					end
 				end else begin

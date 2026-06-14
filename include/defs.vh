@@ -3,6 +3,7 @@
 `define DATA_WIDTH	 		16
 `define FILTER_COEF_WIDTH	18
 `define N_BLOCKS			256
+`define N_CHANNELS			16
 
 `define CLOCK_SPEED 112500000
 `define SAMPLE_RATE 44100

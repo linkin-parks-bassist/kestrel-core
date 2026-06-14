@@ -31,26 +31,28 @@ module dsp_pipeline #(
 		
 		output wire error,
 		
-		input wire instr_write,
-	
-		input wire [data_width - 1 : 0] ctrl_data,
-		
+        input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
+        
 		input wire reg_0_write,
 		input wire reg_1_write,
+		input wire reg_writes_commit,
+		input wire instr_write,
 		
 		input wire filter_coef_write,
 		input wire filter_coef_commit,
-		
 		output wire filter_ack,
 		
-		input wire reg_writes_commit,
-		output wire regfile_syncing,
-	
 		input wire alloc_delay,
 		input wire alloc_filter,
+		
+		input wire data_req,
+		
+		output reg [31:0] data_return,
+		output reg data_return_valid,
+		
+		output wire regfile_syncing,
 		output wire resetting,
-
-		output wire[7:0] out,
+		
 
 		output wire [$clog2(n_blocks) : 0] n_blocks_running,
 		output wire [31:0] commits_accepted,
@@ -64,15 +66,31 @@ module dsp_pipeline #(
 		output wire [sdram_addr_width - 1 : 0] sdram_addr,
 		output wire [data_width - 1 : 0] sdram_data_out,
 
-		input wire [data_width - 1 : 0] sdram_data_in,
-		
-		input wire data_req,
-		
-		output reg [31:0] data_return,
-		output reg data_return_valid,
-
-        input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in
+		input wire [data_width - 1 : 0] sdram_data_in
 	);
+	
+	reg [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in_r;
+	
+	reg reg_0_write_r;
+	reg reg_1_write_r;
+	reg instr_write_r;
+	reg filter_coef_write_r;
+	reg filter_coef_commit_r;
+	reg alloc_delay_r;
+	reg alloc_filter_r;
+	reg data_req_r;
+	
+	always @(posedge clk) begin
+		ctrl_data_in_r <= ctrl_data_in;
+		reg_0_write_r <= reg_0_write;
+		reg_1_write_r <= reg_1_write;
+		instr_write_r <= instr_write;
+		filter_coef_write_r  <= filter_coef_write;
+		filter_coef_commit_r <= filter_coef_commit;
+		alloc_delay_r  <= alloc_delay;
+		alloc_filter_r <= alloc_filter;
+		data_req_r <= data_req;
+	end
 	
 	/*******************/
 	/* Processing core */
@@ -82,11 +100,10 @@ module dsp_pipeline #(
     wire [15:0] stuck_flags_core;
     wire core_ready;
 
-
 	dsp_core #(
 		.data_width(data_width),
 		.n_blocks(n_blocks),
-		.n_channels(8),
+		.n_channels(`N_CHANNELS),
 		.sdram_addr_width(sdram_addr_width)
 	) core (
 		.clk(clk),
@@ -101,9 +118,9 @@ module dsp_pipeline #(
 		
 		.ready(core_ready),
 		
-		.command_reg_0_write(reg_0_write),
-		.command_reg_1_write(reg_1_write),
-		.command_instr_write(instr_write),
+		.command_reg_0_write(reg_0_write_r),
+		.command_reg_1_write(reg_1_write_r),
+		.command_instr_write(instr_write_r),
 		
 		.delay_req(delay_req),
 		.delay_req_ack(delay_req_ack),
@@ -136,7 +153,7 @@ module dsp_pipeline #(
 		.data_return(data_return_core),
 		.data_return_valid(data_return_valid_core),
 
-        .ctrl_data_in(ctrl_data_in),
+        .ctrl_data_in(ctrl_data_in_r),
 		
 		.stuck_flags(stuck_flags_core)
 	);
@@ -207,7 +224,7 @@ module dsp_pipeline #(
 		
 		.enable(pr_enable),
 		
-		.alloc_req(alloc_delay),
+		.alloc_req(alloc_delay_r),
 		
 		.req_in(delay_req),
 		.req_ack(delay_req_ack),
@@ -238,7 +255,7 @@ module dsp_pipeline #(
         .stuck(stuck_delay),
         `endif
 
-        .ctrl_data_in(ctrl_data_in)
+        .ctrl_data_in(ctrl_data_in_r)
 	);
 	
 	wire filter_calc_req;
@@ -248,9 +265,9 @@ module dsp_pipeline #(
 	wire signed [data_width - 1 : 0] filter_data_in;
 	wire filter_data_valid;
 
-	wire [data_width - 1 : 0] filter_coef_write_handle = ctrl_data_in[47:40];
-	wire [data_width - 1 : 0] filter_coef_target = ctrl_data_in[39: 24];
-	wire [17 : 0] filter_coef_data = ctrl_data_in[17:0];
+	wire [data_width - 1 : 0] filter_coef_write_handle = ctrl_data_in_r[47:40];
+	wire [data_width - 1 : 0] filter_coef_target = ctrl_data_in_r[39: 24];
+	wire [17 : 0] filter_coef_data = ctrl_data_in_r[17:0];
 	
     wire stuck_filter;
     
@@ -271,10 +288,10 @@ module dsp_pipeline #(
 		
 		.enable(pr_enable),
 		
-		.alloc_req(alloc_filter),
+		.alloc_req(alloc_filter_r),
 		
-		.coef_write(filter_coef_write),
-		.coef_commit(filter_coef_commit),
+		.coef_write(filter_coef_write_r),
+		.coef_commit(filter_coef_commit_r),
 		.coef_write_handle(filter_coef_write_handle),
 		.coef_target(filter_coef_target),
 		.coef_data(filter_coef_data),
@@ -287,7 +304,7 @@ module dsp_pipeline #(
 		.req_response(filter_req_response),
 		.req_response_valid(filter_req_response_valid),
 
-        .ctrl_data_in(ctrl_data_in),
+        .ctrl_data_in(ctrl_data_in_r),
         
         .stuck(stuck_filter)
 	);
@@ -387,7 +404,7 @@ module dsp_pipeline #(
 	assign stuck_flags[15:0] = stuck_flags_core;
 	
 	always @(*) begin
-		case (ctrl_data_in[7:0])
+		case (ctrl_data_in_r[7:0])
 			`DATA_REQ_N_BLOCKS:    	data_req_target = DATA_REQ_TARGET_CORE;
 			`DATA_REQ_BLOCK_INSTR: 	data_req_target = DATA_REQ_TARGET_CORE;
 			`DATA_REQ_BLOCK_REG:   	data_req_target = DATA_REQ_TARGET_CORE;
@@ -405,8 +422,8 @@ module dsp_pipeline #(
 		endcase
 	end
 	
-	assign data_req_core  = data_req & (data_req_target == DATA_REQ_TARGET_CORE);
-	assign data_req_delay = data_req & (data_req_target == DATA_REQ_TARGET_DELAY);
+	assign data_req_core  = data_req_r & (data_req_target == DATA_REQ_TARGET_CORE);
+	assign data_req_delay = data_req_r & (data_req_target == DATA_REQ_TARGET_DELAY);
 	
 	always @(posedge clk) begin
 		data_return_valid <= 0;
@@ -415,14 +432,14 @@ module dsp_pipeline #(
 			data_return_valid <= 0;
 			data_req_active <= 0;
 		end else begin
-			if (data_req) begin
-				data_req_ctrl_data_r <= ctrl_data_in;
+			if (data_req_r) begin
+				data_req_ctrl_data_r <= ctrl_data_in_r;
 				data_req_active <= 1;
 				data_req_target_r <= data_req_target;
 				
 				if (data_req_target == DATA_REQ_TARGET_NONE) begin
 					data_req_active <= 0;
-					case (ctrl_data_in[7:0])
+					case (ctrl_data_in_r[7:0])
 						`DATA_REQ_SAMPLE_COUNT: begin
 							data_return <= sample_ctr;
 							data_return_valid <= 1;

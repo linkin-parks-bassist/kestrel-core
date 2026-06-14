@@ -29,7 +29,7 @@ module lut_master #(parameter integer data_width) (
 		
 	);
 	
-		rw_req_t pending_req;
+	rw_req_t pending_req;
 	reg req_pending;
 	
 	always @(posedge clk) begin

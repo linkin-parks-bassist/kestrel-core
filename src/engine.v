@@ -73,7 +73,7 @@ module dsp_engine #(
 
 			.set_input_gain(set_input_gain),
 			.set_output_gain(set_output_gain),
-			.data_in(ctrl_data_out),
+			.data_in(ctrl_data_out[data_width - 1 : 0]),
 			
 			.input_gain(input_gain),
 			.input_gains(input_gains),
@@ -133,7 +133,6 @@ module dsp_engine #(
 
 		.instr_write(pipeline_a_block_instr_write),
 	
-		.ctrl_data(ctrl_data_out),
 		.reg_0_write(pipeline_a_block_reg_0_write),
 		.reg_1_write(pipeline_a_block_reg_1_write),
 		
@@ -169,7 +168,7 @@ module dsp_engine #(
 		.data_return(pipeline_a_data_return),
 		.data_return_valid(pipeline_a_data_return_valid),
 
-        .ctrl_data_in(ctrl_data)
+        .ctrl_data_in(ctrl_data_out)
 	);
 	
 	dsp_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .sdram_addr_width(sdram_addr_width - 1)) pipeline_b (
@@ -185,7 +184,6 @@ module dsp_engine #(
 
 		.instr_write(pipeline_b_block_instr_write),
 	
-		.ctrl_data(ctrl_data_out),
 		.reg_0_write(pipeline_b_block_reg_0_write),
 		.reg_1_write(pipeline_b_block_reg_1_write),
 		
@@ -221,7 +219,7 @@ module dsp_engine #(
 		.data_return(pipeline_b_data_return),
 		.data_return_valid(pipeline_b_data_return_valid),
 
-        .ctrl_data_in(ctrl_data)
+        .ctrl_data_in(ctrl_data_out)
 	);
 	
 	wire signed [data_width - 1 : 0] sample_out_processed;
@@ -308,14 +306,6 @@ module dsp_engine #(
 	wire pipeline_a_filter_coef_commit = filter_coef_commit[0];
 	wire pipeline_b_filter_coef_write  = filter_coef_write [1];
 	wire pipeline_b_filter_coef_commit = filter_coef_commit[1];
-	wire [data_width - 1 : 0] filter_coef_write_handle;
-	wire [data_width - 1 : 0] filter_order_ff;
-	wire [data_width - 1 : 0] filter_order_fb;
-	wire [7 : 0] filter_alloc_format;
-	wire [data_width - 1 : 0] filter_coef_target;
-	wire [filter_width : 0] filter_coef_data;
-
-    wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data;
     
     wire [1:0] pipeline_data_req;
     
@@ -342,11 +332,6 @@ module dsp_engine #(
 		
 		.current_pipeline(current_pipeline),
 		
-		.block_target(block_target),
-		.reg_target(reg_target),
-		.instr_out(ctrl_instr_out),
-		.data_out(ctrl_data_out),
-		
 		.block_instr_write(block_instr_write),
 		.block_reg_0_write(block_reg_0_write),
 		.block_reg_1_write(block_reg_1_write),
@@ -355,17 +340,9 @@ module dsp_engine #(
 		
 		.alloc_delay(alloc_delay),
 		.alloc_filter(alloc_filter),
-		.delay_size_out(delay_alloc_size),
-		.init_delay_out(delay_init_delay),
-		.filter_order_ff_out(filter_order_ff),
-		.filter_order_fb_out(filter_order_fb),
-		.filter_alloc_format(filter_alloc_format),
 		.filter_coef_write(filter_coef_write),
 		.filter_coef_commit(filter_coef_commit),
 		.filter_ack(filter_ack),
-		.filter_coef_write_handle_out(filter_coef_write_handle),
-		.filter_coef_target_out(filter_coef_target),
-		.filter_coef_data_out(filter_coef_data),
 		
 		.swap_pipelines(swap_pipelines),
 		.swap_tail_enable(swap_tail_enable),
@@ -389,7 +366,7 @@ module dsp_engine #(
 		.pipeline_data_return(pipeline_data_return),
 		.pipeline_data_return_valid(pipeline_data_return_valid),
 
-        .ctrl_data_out(ctrl_data),
+        .ctrl_data_out(ctrl_data_out),
         
         .sdram_read_count(sdram_read_count),
         .sdram_write_count(sdram_write_count)
@@ -472,8 +449,7 @@ module dsp_engine #(
 	wire [$clog2(n_blocks) - 1 : 0] block_target;
 	wire reg_target;
 
-	wire [data_width 		 - 1 : 0] ctrl_data_out;
-	wire [`BLOCK_INSTR_WIDTH - 1 : 0] ctrl_instr_out;
+	wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_out;
 
 	wire swap_pipelines;
 	wire swap_tail_enable;

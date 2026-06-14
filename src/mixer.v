@@ -83,10 +83,18 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 	envelope_follower #(.data_width(data_width)) env_b
 		(.clk(clk), .reset(reset), .enable(1), .sample_in(out_sample_1_r), .sample_valid(tick), .envelope(envelopes[1]), .envelope_valid(envelope_valids[1]));
 	
-	always @(posedge clk) begin
+	reg set_input_gain_r;
+	reg set_output_gain_r;
 	
-		if (set_input_gain)   input_gain <= data_in;
-		if (set_output_gain) output_gain <= data_in;
+	reg [data_width - 1 : 0] data_in_r;
+	
+	always @(posedge clk) begin
+		set_input_gain_r  <= set_input_gain;
+		set_output_gain_r <= set_output_gain;
+		data_in_r <= data_in;
+	
+		if (set_input_gain_r)   input_gain <= data_in_r;
+		if (set_output_gain_r) output_gain <= data_in_r;
 		
 		if (swap_pipelines) begin
 			pipelines_swapping <= 1;
@@ -121,15 +129,14 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 			
 			envelope_a_r <= 0;
 			envelope_b_r <= 0;
+			
+			set_input_gain_r <= 0;
+			set_output_gain_r <= 0;
 		end else if (tick) begin
 			out_sample_0_r <= out_samples[0];
 			out_sample_1_r <= out_samples[1];
 		
 			case (swap_state)
-				NO_SWAP: begin
-				
-				end
-				
 				CROSSFADE: begin
 					if (output_gains[ current_pipeline_r] == 0) begin
 						output_gains[~current_pipeline_r] <= unity_gain;
