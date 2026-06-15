@@ -103,6 +103,7 @@ module delay_master #(parameter integer data_width,
 	localparam READ_7	 	= 4'd12;
 	localparam READ_8	 	= 4'd13;
 	localparam READ_9	 	= 4'd14;
+	localparam READ_2_5	 	= 4'd15;
 	
 	reg [3:0] state;
 	reg [3:0] state_prev;
@@ -177,6 +178,7 @@ module delay_master #(parameter integer data_width,
 	
 	wire signed [2 * data_width - 1 : 0] product_a = $signed(mul_a) * $signed(mul_b);
 	reg  signed [2 * data_width - 1 : 0] product_a_r;
+	reg  signed [2 * data_width - 1 : 0] product_a_addr_sh;
 	
 	wire [addr_width - 1 : 0] alloc_size_wm  = alloc_size_r [addr_width - 1 : 0];
 	wire [addr_width - 1 : 0] alloc_delay_wm = alloc_delay_r[addr_width - 1 : 0];
@@ -271,11 +273,16 @@ module delay_master #(parameter integer data_width,
 					mul_a <= product_a_r >>> (data_width - 1);
 					mul_b <= size_f[addr_width - 1 -: data_width];
 					
+					state <= READ_2_5;
+				end
+				
+				READ_2_5: begin
+					product_a_addr_sh <= product_a >>> (data_width - 1 - (addr_width - data_width));
 					state <= READ_3;
 				end
 				
 				READ_3: begin
-					delay_addr_delta <= delay + (product_a >>> (data_width - 1 - (addr_width - data_width)));
+					delay_addr_delta <= delay + product_a_addr_sh;
 					state <= READ_4;
 				end
 				
