@@ -72,7 +72,9 @@ module delay_master #(parameter integer data_width,
 	
     reg alloc_req_r;
     reg [addr_width - 1 : 0] alloc_size_r;
+    reg [addr_width - 1 : 0] alloc_size_r_r;
 	reg [addr_width - 1 : 0] alloc_delay_r;
+	reg [addr_width - 1 : 0] alloc_delay_r_r;
 
     always @(posedge clk) begin
         if (reset) begin
@@ -80,7 +82,9 @@ module delay_master #(parameter integer data_width,
         end else begin
             alloc_req_r <= alloc_req;
             alloc_size_r <= ctrl_data_in[24 + addr_width - 1 : 24];
+            alloc_size_r_r <= alloc_size_r;
             alloc_delay_r <= ctrl_data_in[addr_width - 1 : 0];
+            alloc_delay_r_r <= alloc_delay_r;
         end
     end
 
@@ -88,25 +92,28 @@ module delay_master #(parameter integer data_width,
 	
 	assign any_buffers = |n_buffers_allocd;
 	
-	localparam IDLE 	 	= 4'd0;
-	localparam WRITE_1		= 4'd1;
-	localparam WRITE_2	 	= 4'd2;
-	localparam WRITE_3	 	= 4'd3;
-	localparam WRITE_4	 	= 4'd4;
-	localparam WRITE_5	 	= 4'd5;
-	localparam READ_1	 	= 4'd6;
-	localparam READ_2	 	= 4'd7;
-	localparam READ_3	 	= 4'd8;
-	localparam READ_4	 	= 4'd9;
-	localparam READ_5	 	= 4'd10;
-	localparam READ_6	 	= 4'd11;
-	localparam READ_7	 	= 4'd12;
-	localparam READ_8	 	= 4'd13;
-	localparam READ_9	 	= 4'd14;
-	localparam READ_2_5	 	= 4'd15;
+	localparam IDLE 	 	= 5'd0;
+	localparam WRITE_1		= 5'd1;
+	localparam WRITE_2	 	= 5'd2;
+	localparam WRITE_3	 	= 5'd3;
+	localparam WRITE_4	 	= 5'd4;
+	localparam WRITE_5	 	= 5'd5;
+	localparam READ_1	 	= 5'd6;
+	localparam READ_2	 	= 5'd7;
+	localparam READ_3	 	= 5'd8;
+	localparam READ_4	 	= 5'd9;
+	localparam READ_5	 	= 5'd10;
+	localparam READ_6	 	= 5'd11;
+	localparam READ_7	 	= 5'd12;
+	localparam READ_8	 	= 5'd13;
+	localparam READ_9	 	= 5'd14;
+	localparam READ_2_5	 	= 5'd15;
 	
-	reg [3:0] state;
-	reg [3:0] state_prev;
+	localparam CONFIG = 5'd16;
+	localparam ALLOC_REQ_1 = 5'd17;
+	
+	reg [4:0] state;
+	reg [4:0] state_prev;
 	
 	localparam buf_info_width = addr_width + addr_width + addr_width + addr_width + data_width + 1;
 	localparam [data_width - 1 : 0] unity_gain = 1 << (data_width - 2);
@@ -156,11 +163,18 @@ module delay_master #(parameter integer data_width,
 	reg [addr_width - 1 : 0] alloc_addr;
 	
 	reg signed [addr_width - 1 : 0] delay_addr_delta;
-	reg  [addr_width - 1 : 0] rdo;
+	reg signed [addr_width - 1 : 0] delay_addr_delta_min;
+	reg signed [addr_width - 1 : 0] delay_addr_delta_max;
+	wire signed [addr_width - 1 : 0] delay_addr_delta_clamped =   delay_addr_delta > delay_addr_delta_max  ? delay_addr_delta_max
+															  : ((delay_addr_delta < delay_addr_delta_min) ? delay_addr_delta_min
+															  :                                              delay_addr_delta);
 	wire [addr_width - 1 : 0] delay_addr = (delay_addr_delta > position) ? addr + position - delay_addr_delta + size
 																		 : addr + position - delay_addr_delta;
 	
 	reg [$clog2(n_buffers + 1) - 1 : 0] n_buffers_allocd;
+	
+	reg buffers_exhausted_r;
+	reg alloc_too_big_r;
 	
 	wire buffers_exhausted 	= (n_buffers_allocd == n_buffers);
 	wire alloc_too_big		= alloc_addr + alloc_size_r > memory_size;
@@ -180,9 +194,6 @@ module delay_master #(parameter integer data_width,
 	reg  signed [2 * data_width - 1 : 0] product_a_r;
 	reg  signed [2 * data_width - 1 : 0] product_a_addr_sh;
 	
-	wire [addr_width - 1 : 0] alloc_size_wm  = alloc_size_r [addr_width - 1 : 0];
-	wire [addr_width - 1 : 0] alloc_delay_wm = alloc_delay_r[addr_width - 1 : 0];
-	
 	always @(posedge clk) begin
 		req_ack <= 0;
 		req_response_valid <= 0;
@@ -199,7 +210,7 @@ module delay_master #(parameter integer data_width,
 		state_prev <= state;
 		
 		if (reset) begin
-			state <= IDLE;
+			state <= CONFIG;
 			
 			n_buffers_allocd <= 0;
 			buffer_initd 	 <= 0;
@@ -212,26 +223,41 @@ module delay_master #(parameter integer data_width,
 			alloc_addr <= 0;
 			n_buffers_allocd <= 0;
 			
-		end else if (alloc_req_r) begin
-			if (alloc_too_big || buffers_exhausted) begin
-				invalid_alloc <= 1;
-			end else begin
-				alloc_addr <= alloc_addr + alloc_size_r;
-				buffer_initd[n_buffers_allocd] <= 1;
-				n_buffers_allocd <= n_buffers_allocd + 1;
-				
-                buf_info_write_data <= '0;
-				buf_info_write_data[buf_info_width                  - 1 : buf_info_width -     addr_width             ] <= alloc_addr;
-				buf_info_write_data[buf_info_width - 1 * addr_width - 1 : buf_info_width - 2 * addr_width             ] <= alloc_size_wm;
-				buf_info_write_data[buf_info_width - 2 * addr_width - 1 : buf_info_width - 2 * addr_width - addr_width] <= alloc_delay_wm;
-				
-				buf_info_write_handle <= n_buffers_allocd;
-				buf_info_write_enable <= 1;
-			end
-		end else if (enable) begin
+		end else begin
 			case (state)
+				
+				CONFIG: begin
+					if (enable) begin
+						state <= IDLE;
+					end else if (alloc_req_r) begin
+						if (alloc_too_big || buffers_exhausted) begin
+							invalid_alloc <= 1;
+						end else begin
+							state <= ALLOC_REQ_1;
+						end
+					end
+				end
+				
+				ALLOC_REQ_1: begin
+					alloc_addr <= alloc_addr + alloc_size_r_r;
+					buffer_initd[n_buffers_allocd] <= 1;
+					n_buffers_allocd <= n_buffers_allocd + 1;
+					
+					buf_info_write_data <= '0;
+					buf_info_write_data[buf_info_width                  - 1 : buf_info_width -     addr_width             ] <= alloc_addr;
+					buf_info_write_data[buf_info_width - 1 * addr_width - 1 : buf_info_width - 2 * addr_width             ] <= alloc_size_r_r;
+					buf_info_write_data[buf_info_width - 2 * addr_width - 1 : buf_info_width - 2 * addr_width - addr_width] <= alloc_delay_r_r;
+					
+					buf_info_write_handle <= n_buffers_allocd;
+					buf_info_write_enable <= 1;
+					
+					state <= CONFIG;
+				end
+
 				IDLE: begin
-					if (req_pending) begin
+					if (~enable) begin
+						state <= CONFIG;
+					end else if (req_pending) begin
 						active_req <= pending_req;
 						req_ack <= 1;
 						
@@ -283,17 +309,13 @@ module delay_master #(parameter integer data_width,
 				
 				READ_3: begin
 					delay_addr_delta <= delay + product_a_addr_sh;
+					delay_addr_delta_min <= -$signed(size) + 1;
+					delay_addr_delta_max <= size - 1;
 					state <= READ_4;
 				end
 				
 				READ_4: begin
-					if (delay_addr_delta <  -$signed(size) + 1)
-						delay_addr_delta <= -$signed(size) + 1;
-					else if (delay_addr_delta > size - 1)
-						delay_addr_delta <= size - 1;
-					else
-						delay_addr_delta <= delay_addr_delta;
-					
+					delay_addr_delta <= delay_addr_delta_clamped;
 					state <= READ_5;
 				end
 				
