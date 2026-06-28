@@ -747,10 +747,6 @@ module filter_unit_normal_fixed
     reg signed [math_width - 1 : 0] coef_update_data_pending;
     
     always @(posedge clk) begin
-		alloc_ack 			<= 0;
-		coef_write_ack 		<= 0;
-		coef_update_ack 	<= 0;
-		coef_commit_ack 	<= 0;
 		if (reset) begin
 			alloc_pending 		<= 0;
 			coef_write_pending 	<= 0;
@@ -810,6 +806,11 @@ module filter_unit_normal_fixed
 		
 		req_ack <= 0;
 	
+		alloc_ack 			<= 0;
+		coef_write_ack 		<= 0;
+		coef_update_ack 	<= 0;
+		coef_commit_ack 	<= 0;
+
 		if (reset) begin
 			busy <= 0;
 			calc_cooldown <= 0;
