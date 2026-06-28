@@ -23,7 +23,7 @@ module pwm_generator #(parameter data_width = 16, parameter ctr_width = 7)
 			data_r <= 0;
 		end else if (enable) begin
 			if (data_valid) begin
-				data_r <= data_in_abs[data_width - 1 :- ctr_width];
+				data_r <= data_in_abs[data_width - 1 : data_width - 1 - ctr_width];
 				ctr <= 0;
 			end else begin
 				ctr <= ctr + 1;
