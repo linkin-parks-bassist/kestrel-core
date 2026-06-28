@@ -143,6 +143,7 @@ module dsp_engine #(
 		.alloc_filter(pipeline_a_alloc_filter),
 		
 		.filter_coef_write(pipeline_a_filter_coef_write),
+		.filter_coef_update(pipeline_a_filter_coef_update),
 		.filter_coef_commit(pipeline_a_filter_coef_commit),
 		
 		.filter_ack(filter_ack[0]),
@@ -194,6 +195,7 @@ module dsp_engine #(
 		.alloc_filter(pipeline_b_alloc_filter),
 		
 		.filter_coef_write(pipeline_b_filter_coef_write),
+		.filter_coef_update(pipeline_b_filter_coef_update),
 		.filter_coef_commit(pipeline_b_filter_coef_commit),
 		
 		.filter_ack(filter_ack[1]),
@@ -300,11 +302,14 @@ module dsp_engine #(
 	wire pipeline_a_alloc_filter = alloc_filter[0];
 	wire pipeline_b_alloc_filter = alloc_filter[1];
 	wire [1:0] filter_coef_write;
+	wire [1:0] filter_coef_update;
 	wire [1:0] filter_coef_commit;
 	wire [1:0] filter_ack;
 	wire pipeline_a_filter_coef_write  = filter_coef_write [0];
+	wire pipeline_a_filter_coef_update = filter_coef_update[0];
 	wire pipeline_a_filter_coef_commit = filter_coef_commit[0];
 	wire pipeline_b_filter_coef_write  = filter_coef_write [1];
+	wire pipeline_b_filter_coef_update = filter_coef_update[1];
 	wire pipeline_b_filter_coef_commit = filter_coef_commit[1];
     
     wire [1:0] pipeline_data_req;
@@ -341,6 +346,7 @@ module dsp_engine #(
 		.alloc_delay(alloc_delay),
 		.alloc_filter(alloc_filter),
 		.filter_coef_write(filter_coef_write),
+		.filter_coef_update(filter_coef_update),
 		.filter_coef_commit(filter_coef_commit),
 		.filter_ack(filter_ack),
 		

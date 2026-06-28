@@ -225,10 +225,38 @@ module top
 	/***********/
 
 	// Useful LED indicators (active low)
-	assign led0 = ~sys_clk_blinker;
-	assign led1 = ~lrclk_blinker;
-	assign led3 = ~mclk_blinker;
-	assign led4 = ~bclk_blinker;
+	assign led0 = ~pwm_out_1;
+	assign led1 = ~pwm_out_2;
+	assign led3 = ~0;
+	assign led4 = ~0;
+	
+	wire pwm_out_1;
+	
+	pwm_generator pwm_1
+		(
+			.clk(sys_clk),
+			.reset(reset),
+			.enable(1),
+			
+			.data_in(sample_in),
+			.data_valid(sample_valid),
+			
+			.out(pwm_out_1)
+		);
+	
+	wire pwm_out_2;
+	
+	pwm_generator pwm_2
+		(
+			.clk(sys_clk),
+			.reset(reset),
+			.enable(1),
+			
+			.data_in(sample_out),
+			.data_valid(sample_valid),
+			
+			.out(pwm_out_2)
+		);
 
 	// I2S
 	wire sample_valid;

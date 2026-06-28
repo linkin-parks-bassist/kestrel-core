@@ -491,6 +491,587 @@ module filter_unit_normal
 	end
 endmodule
 
+module filter_unit_normal_fixed
+	(
+		input wire clk,
+		input wire reset,
+		input wire enable,
+		
+		input wire alloc_req,
+		
+		input wire coef_write,
+		input wire coef_update,
+		input wire coef_commit,
+		
+		output reg req_ack,
+		input wire req_valid,
+		input rw_req_t req_in,
+		output reg req_invalid,
+		output reg [data_width - 1 : 0] req_response,
+		output reg req_response_valid,
+
+        input wire [`CTRL_DATA_BUS_WIDTH - 1 : 0] ctrl_data_in,
+        
+        output wire stuck
+	);
+	
+	rw_req_t pending_req;
+	reg req_pending;
+	
+	always @(posedge clk) begin
+		if (req_valid) begin
+			pending_req <= req_in;
+			req_pending <= 1;
+		end else if (req_ack) begin
+			req_pending <= 0;
+		end
+	end
+	
+	rw_req_t active_req;
+	
+	wire [data_width - 1 : 0] req_arg_a = active_req.arg_a;
+	wire [data_width - 1 : 0] req_arg_b = active_req.arg_b;
+	wire [7 : 0] req_handle = active_req.handle;
+	wire [3:0] req_flags = active_req.flags;
+	wire [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
+	
+	reg [$clog2(`CYCLES_PER_SAMPLE) : 0] stuck_ctr;
+	assign stuck = (stuck_ctr == `CYCLES_PER_SAMPLE);
+	
+	always @(posedge clk) begin
+		if (reset || next_handle == 0 || state != state_prev)
+			stuck_ctr <= 0;
+		else if (enable && stuck_ctr < `CYCLES_PER_SAMPLE)
+			stuck_ctr <= stuck_ctr + 1;
+	end
+	
+	localparam handle_width = $clog2(`N_FILTERS);
+	localparam addr_width   = $clog2(`FILTER_MEM_SIZE);
+	
+	localparam degree_width = data_width;
+	localparam config_width = 
+		   addr_width    // address
+		 + degree_width  // feed-forward degree
+		 + degree_width  // feed-back degree
+		 + 5			 // format
+		 + 1;			 // coef bank
+	
+	reg [3:0] req_type_r;
+
+    reg alloc_req_r;
+    reg coef_write_r;
+    reg coef_update_r;
+    reg coef_commit_r;
+
+    reg [7 : 0] alloc_format_r;
+    reg [data_width - 1 : 0] order_ff_r;
+	reg [data_width - 1 : 0] order_fb_r;
+
+    reg [7:0] coef_write_handle_r;
+    reg [7:0] coef_commit_handle_r;
+    reg [data_width - 1 : 0] coef_target_r;
+    reg signed [math_width - 1 : 0] coef_data_r;
+
+    always @(posedge clk) begin
+        if (reset) begin
+            alloc_req_r <= 0;
+            coef_write_r <= 0;
+            coef_update_r <= 0;
+            coef_commit_r  <= 0;
+        end else begin
+            alloc_req_r <= alloc_req;
+            coef_write_r <= coef_write;
+            coef_update_r <= coef_update;
+            coef_commit_r  <= coef_commit;
+            
+            order_fb_r <= ctrl_data_in[7 : 0];
+            order_ff_r <= ctrl_data_in[15 : 8];
+            alloc_format_r <= ctrl_data_in[23 : 16];
+
+            coef_write_handle_r <= ctrl_data_in[6 * 8 - 1 : 5 * 8];
+            coef_commit_handle_r <= ctrl_data_in[7 : 0];
+            coef_target_r <= ctrl_data_in[24 + 2 * 8 - 1 : 24];
+            coef_data_r <= ctrl_data_in[data_width - 1 + math_width - data_width : 0];
+        end
+    end
+
+	reg signed [math_width - 1 : 0] coef_mem_a [`FILTER_MEM_SIZE  - 1 : 0];
+	reg signed [math_width - 1 : 0] coef_mem_b [`FILTER_MEM_SIZE  - 1 : 0];
+	reg signed [math_width - 1 : 0] state_mem  [`FILTER_MEM_SIZE  - 1 : 0];
+	reg [config_width - 1 : 0] config_mem [`N_FILTERS - 1 : 0];
+	
+	reg [`N_FILTERS - 1 : 0] state_invalid;
+
+	reg         [addr_width - 1 : 0] coef_mem_read_addr;
+	reg signed  [math_width - 1 : 0] coef_mem_a_read_val;
+	reg signed  [math_width - 1 : 0] coef_mem_b_read_val;
+	wire signed [math_width - 1 : 0] coef_mem_read_val = coef_bank ? coef_mem_b_read_val : coef_mem_a_read_val;
+	reg         [addr_width - 1 : 0] coef_mem_write_addr;
+	reg signed  [math_width - 1 : 0] coef_mem_write_val;
+	reg coef_mem_a_write_enable;
+	reg coef_mem_b_write_enable;
+
+	reg        [addr_width - 1 : 0] state_mem_read_addr;
+	reg        [addr_width - 1 : 0] state_mem_read_addr_prev;
+	reg signed [math_width - 1 : 0] state_mem_read_val;
+	reg        [addr_width - 1 : 0] state_mem_write_addr;
+	reg signed [math_width - 1 : 0] state_mem_write_val;
+	reg state_mem_write_enable;
+
+	reg        [handle_width - 1 : 0] config_mem_read_addr;
+	reg signed [config_width - 1 : 0] config_mem_read_val;
+	reg        [handle_width - 1 : 0] config_mem_write_addr;
+	reg signed [config_width - 1 : 0] config_mem_write_val;
+	reg config_mem_write_enable;
+	
+	always @(posedge clk) begin
+		coef_mem_a_read_val <= coef_mem_a[coef_mem_read_addr];
+		if (coef_mem_a_write_enable) coef_mem_a[coef_mem_write_addr] <= coef_mem_write_val;
+		
+		coef_mem_b_read_val <= coef_mem_b[coef_mem_read_addr];
+		if (coef_mem_b_write_enable) coef_mem_b[coef_mem_write_addr] <= coef_mem_write_val;
+		
+		state_mem_read_val <= state_mem[state_mem_read_addr];
+		if (state_mem_write_enable) state_mem[state_mem_write_addr] <= state_mem_write_val;
+		
+		config_mem_read_val <= config_mem[config_mem_read_addr];
+		if (config_mem_write_enable) config_mem[config_mem_write_addr] <= config_mem_write_val;
+	end
+
+	reg [handle_width : 0] next_handle;
+	reg [addr_width - 1 : 0] next_addr;
+	
+	reg [addr_width   - 1 : 0] current_addr;
+	reg [degree_width - 1 : 0] current_order_ff;
+	reg [degree_width - 1 : 0] current_order_fb;
+	
+	reg busy;
+	
+	wire filter_capacity = (next_handle < `N_FILTERS);
+	wire mem_capacity = (next_addr + order_ff_r + order_fb_r < `FILTER_MEM_SIZE);
+	
+	reg [addr_width - 1 : 0] coef_target_addr;
+	reg signed [math_width - 1 : 0] coef_to_write;
+	
+	reg coef_writing;
+	reg coef_committing;
+	reg wait_one;
+	
+	reg signed [math_width - 1 : 0] factor_a;
+	reg signed [math_width - 1 : 0] factor_b;
+	
+	wire signed [2 * math_width - 1 : 0] product = factor_a * factor_b;
+	wire signed [2 * math_width + 8 - 1 : 0] product_sext = {{8{product[2 * math_width - 1]}}, product};
+	wire signed [2 * math_width + 8 - 1 : 0] product_sum = accumulator + product_sext;
+	
+	reg signed [2 * math_width + 8 - 1 : 0] accumulator;
+	
+	localparam signed [2 * math_width + 8 - 1  : 0] sat_max = ( 1 << (data_width - 1)) - 1;
+	localparam signed [2 * math_width + 8 - 1  : 0] sat_min = (-1 << (data_width - 1));
+	
+	localparam signed [data_width - 1  : 0] sat_max_t = ( 1 << (data_width - 1)) - 1;
+	localparam signed [data_width - 1  : 0] sat_min_t = (-1 << (data_width - 1));
+	
+	wire signed [data_width - 1 : 0] acc_t = accumulator[data_width - 1 : 0];
+	wire signed [data_width - 1 : 0] resul_sat = (accumulator > sat_max) ? sat_max_t : ((accumulator < sat_min) ? sat_min_t : acc_t);
+	
+	reg calc_cooldown;
+	reg coef_write_cooldown;
+	reg coef_commit_cooldown;
+	
+	always @(posedge clk)
+		state_prev <= state;
+	
+	reg first_sample;
+	reg invalid_state;
+	
+	reg [data_width - 1 : 0] counter;
+	
+	reg [handle_width - 1 : 0] handle_r;
+	reg [5:0] format;
+	reg [8:0] shift;
+	reg coef_bank;
+	
+	reg calculating;
+	
+	reg write_back;
+
+	reg skip_state_write;
+	
+	reg signed [data_width - 1 : 0] data_in_r;
+	
+	wire signed [2 * data_width - 1 : 0] next_pow_p = data_in_r * pow;
+	wire signed [data_width - 1 : 0] next_pow = next_pow_p >>> (data_width - 1);
+	
+	reg signed [data_width : 0] pow;
+	
+	wire poly_mode = (req_type_r == `FILTER_REQ_TYPE_POLY);
+	
+	localparam STATE_IDLE 			= 0;
+	localparam STATE_WRITING 		= 1;
+	localparam STATE_UPDATING 		= 2;
+	localparam STATE_COMMITTING 	= 3;
+	localparam STATE_FETCH_CONFIG 	= 4;
+	localparam STATE_STARTUP 		= 5;
+	localparam STATE_FIRST_SAMPLE 	= 6;
+	localparam STATE_FEED_FORWARD 	= 7;
+	localparam STATE_FEED_BACK		= 8;
+	localparam STATE_DONE			= 9;
+	localparam STATE_SHIFT			= 10;
+	localparam STATE_SEND			= 11;
+	
+	reg [7:0] state;
+	reg [7:0] state_prev;
+	
+	reg alloc_pending;
+	reg alloc_ack;
+	reg coef_write_pending;
+	reg coef_write_ack;
+	reg coef_update_pending;
+	reg coef_update_ack;
+	reg coef_commit_pending;
+	reg coef_commit_ack;
+	
+	reg [7 : 0] alloc_format_pending;
+    reg [data_width - 1 : 0] order_ff_pending;
+	reg [data_width - 1 : 0] order_fb_pending;
+
+    reg [7:0] coef_commit_handle_pending;
+    
+    reg [7:0] coef_write_handle_pending;
+    reg [data_width - 1 : 0] coef_write_target_pending;
+    reg signed [math_width - 1 : 0] coef_write_data_pending;
+
+    reg [7:0] coef_update_handle_pending;
+    reg [data_width - 1 : 0] coef_update_target_pending;
+    reg signed [math_width - 1 : 0] coef_update_data_pending;
+    
+    always @(posedge clk) begin
+		alloc_ack 			<= 0;
+		coef_write_ack 		<= 0;
+		coef_update_ack 	<= 0;
+		coef_commit_ack 	<= 0;
+		if (reset) begin
+			alloc_pending 		<= 0;
+			coef_write_pending 	<= 0;
+			coef_update_pending <= 0;
+			coef_commit_pending <= 0;
+		end else begin
+			if (alloc_req_r) begin
+				alloc_pending <= 1;
+				alloc_format_pending <= alloc_format_r;
+				order_ff_pending <= order_ff_r;
+				order_fb_pending <= order_fb_r;
+			end else if (alloc_ack) begin
+				alloc_pending <= 0;
+			end
+			if (coef_write_r) begin
+				coef_write_pending <= 1;
+				coef_write_handle_pending <= coef_write_handle_r;
+				coef_write_target_pending <= coef_target_r;
+				coef_write_data_pending <= coef_data_r;
+			end else if (coef_write_ack) begin
+				coef_write_pending <= 0;
+			end
+			if (coef_update_r) begin
+				coef_update_pending <= 1;
+				coef_write_handle_pending <= coef_write_handle_r;
+				coef_write_target_pending <= coef_target_r;
+				coef_write_data_pending <= coef_data_r;
+			end else if (coef_update_ack) begin
+				coef_update_pending <= 0;
+			end
+			if (coef_commit_r) begin
+				coef_commit_pending <= 1;
+				coef_commit_handle_pending <= coef_commit_handle_r;
+			end else if (coef_commit_ack) begin
+				coef_commit_pending <= 0;
+			end
+		end
+    end
+    
+    reg alloc_cooldown;
+	
+	always @(posedge clk) begin
+		req_response_valid <= 0;
+		wait_one <= 0;
+		
+		config_mem_write_enable <= 0;
+		coef_mem_a_write_enable <= 0;
+		coef_mem_b_write_enable <= 0;
+		state_mem_write_enable  <= 0;
+		
+		state_mem_read_addr_prev <= state_mem_read_addr;
+		
+		skip_state_write <= 0;
+		
+		alloc_cooldown <= 0;
+		calc_cooldown <= 0;
+		
+		req_ack <= 0;
+	
+		if (reset) begin
+			busy <= 0;
+			calc_cooldown <= 0;
+			next_handle <= 0;
+			next_addr <= 0;
+			
+			state_invalid <= ~0;
+
+			req_response <= 0;
+			
+			current_addr <= 0;
+			current_order_ff <= 0;
+			current_order_fb <= 0;
+			
+			coef_target_addr <= 0;
+			coef_to_write <= 0;
+			
+			coef_committing <= 0;
+			coef_writing <= 0;
+			calculating <= 0;
+			
+			factor_a <= 0;
+			factor_b <= 0;
+			
+			accumulator <= 0;
+			
+			calc_cooldown <= 0;
+			
+			first_sample <= 0;
+			invalid_state <= 1;
+			
+			counter <= 0;
+			
+			handle_r <= 0;
+			format <= 0;
+			shift <= 0;
+			
+			req_type_r <= 0;
+		end else begin
+			case (state)
+				STATE_IDLE: begin
+					if (~alloc_cooldown & alloc_pending) begin
+						alloc_ack <= 1;
+						
+						if (filter_capacity && mem_capacity) begin
+							config_mem_write_addr <= next_handle;
+							config_mem_write_val <= {alloc_format_pending[4:0], order_fb_pending[degree_width - 1 : 0], order_ff_pending[degree_width - 1 : 0], next_addr, 1'b0};
+							config_mem_write_enable <= 1;
+							next_handle <= next_handle + 1;
+							next_addr <= next_addr + order_ff_pending + order_fb_pending;
+							state_invalid[next_handle] <= 1;
+							alloc_cooldown <= 1;
+						end
+					end else if (coef_write_pending) begin
+						coef_write_ack <= 1;
+						
+						config_mem_read_addr <= coef_write_handle_pending;
+						coef_target_addr <= coef_write_target_pending[addr_width - 1 : 0];
+						coef_to_write <= coef_write_data_pending;
+						state <= STATE_WRITING;
+						wait_one <= 1;
+					end else if (coef_update_pending) begin
+						coef_update_ack <= 1;
+						
+						config_mem_read_addr <= coef_write_handle_pending;
+						coef_target_addr <= coef_write_target_pending[addr_width - 1 : 0];
+						coef_to_write <= coef_write_data_pending;
+						state <= STATE_UPDATING;
+						wait_one <= 1;
+					end else if (coef_commit_pending) begin
+						coef_commit_ack <= 1;
+						
+						config_mem_read_addr <= coef_commit_handle_pending;
+						state <= STATE_COMMITTING;
+						wait_one <= 1;
+					end else if (req_pending) begin
+						req_ack <= 1;
+					
+						if (pending_req.handle >= next_handle) begin
+							req_response_valid <= 1;
+							req_response <= pending_req.arg_a;
+						end else begin
+							wait_one <= 1;
+							calculating <= 1;
+							
+							config_mem_read_addr <= pending_req.handle;
+							
+							accumulator <= 0;
+							
+							invalid_state <= state_invalid[pending_req.handle];
+							
+							handle_r <= pending_req.handle;
+							data_in_r <= pending_req.flags[0] ? req_response : pending_req.arg_a;
+							req_type_r <= pending_req.flags;
+							
+							if (pending_req.flags == `FILTER_REQ_TYPE_POLY) begin
+								pow <= (1 << data_width - 1);
+							end
+							
+							state <= STATE_FETCH_CONFIG;
+						end
+					end
+				end
+				
+				STATE_WRITING: begin
+					if (!wait_one) begin
+						coef_mem_write_addr <= config_mem_read_val[addr_width : 1] + coef_target_addr;
+						coef_mem_write_val <= coef_to_write;
+						{coef_mem_b_write_enable, coef_mem_a_write_enable} <= {config_mem_read_val[0], ~config_mem_read_val[0]};
+						state <= STATE_IDLE;
+					end
+				end
+
+				STATE_UPDATING: begin
+					if (!wait_one) begin
+						coef_mem_write_addr <= config_mem_read_val[addr_width : 1] + coef_target_addr;
+						coef_mem_write_val <= coef_to_write;
+						{coef_mem_b_write_enable, coef_mem_a_write_enable} <= {~config_mem_read_val[0], config_mem_read_val[0]};
+						state <= STATE_IDLE;
+					end
+				end
+
+				STATE_COMMITTING: begin
+					if (!wait_one) begin
+						config_mem_write_addr <= config_mem_read_addr;
+						config_mem_write_val <= {config_mem_read_val[config_width - 1 : 1], ~config_mem_read_val[0]};
+						config_mem_write_enable <= 1;
+						state <= STATE_IDLE;
+					end
+				end
+
+				STATE_FETCH_CONFIG: begin
+					if (!wait_one) begin
+						{format, current_order_fb, current_order_ff, current_addr, coef_bank} <= config_mem_read_val;
+						coef_mem_read_addr  <= config_mem_read_val[addr_width : 1];
+						state_mem_read_addr <= config_mem_read_val[addr_width : 1];
+						state <= STATE_STARTUP;
+						counter <= 0;
+					end
+				end
+					
+				STATE_STARTUP: begin
+					coef_mem_read_addr <= coef_mem_read_addr + 1;
+					state <= STATE_FIRST_SAMPLE;
+				end
+				
+				STATE_FIRST_SAMPLE: begin
+					factor_a <= coef_mem_read_val;
+					factor_b <= poly_mode ? pow : data_in_r;
+					
+					pow <= next_pow;
+					
+					coef_mem_read_addr <= coef_mem_read_addr + 1;
+					state_mem_read_addr <= state_mem_read_addr + 1;
+					
+					counter <= 1;
+					state <= STATE_FEED_FORWARD;
+				end
+				
+				STATE_FEED_FORWARD: begin
+					accumulator <= accumulator + product_sext;
+				
+					coef_mem_read_addr  <= coef_mem_read_addr  + 1;
+					state_mem_read_addr <= state_mem_read_addr + 1;
+					
+					if (!poly_mode) begin
+						state_mem_write_addr <= state_mem_read_addr_prev;
+						state_mem_write_val  <= factor_b;
+						state_mem_write_enable <= 1;
+					end
+					
+					counter <= counter + 1;
+					
+					factor_a <=  coef_mem_read_val;
+					factor_b <= poly_mode ? pow : (invalid_state ? 0 : state_mem_read_val);
+					
+					pow <= next_pow;
+					
+					if (counter == current_order_ff - 1) begin
+						skip_state_write <= 1;
+						if (current_order_fb == 0) begin
+							state <= STATE_DONE;
+						end else begin
+							state <= STATE_FEED_BACK;
+							counter <= 0;
+						end
+					end
+				end
+				
+				STATE_FEED_BACK: begin
+					accumulator <= product_sum;
+					
+					state_mem_write_addr <= state_mem_read_addr_prev;
+					state_mem_write_val  <= factor_b;
+					state_mem_write_enable <= ~skip_state_write;
+					
+					coef_mem_read_addr  <= coef_mem_read_addr  + 1;
+					state_mem_read_addr <= state_mem_read_addr + 1;
+					counter <= counter + 1;
+					
+					factor_a <=  coef_mem_read_val;
+					factor_b <= invalid_state ? 0 : state_mem_read_val;
+					
+					if (counter == current_order_fb - 1) begin
+						state <= STATE_DONE;
+					end
+				end
+				
+				STATE_DONE: begin
+					accumulator <= product_sum;
+					state <= STATE_SHIFT;
+					
+					shift <= math_width - 1 - format;
+					
+					if (!poly_mode) begin
+						state_mem_write_addr   <= state_mem_read_addr_prev;
+						state_mem_write_val    <= factor_b;
+						state_mem_write_enable <= ~skip_state_write;
+					end
+				end
+				
+				STATE_SHIFT: begin
+					if (shift >= 8) begin
+						accumulator <= accumulator >>> 8;
+						shift <= shift - 8;
+					end else if (shift[2]) begin
+						accumulator <= accumulator >>> 4;
+						shift <= shift & 5'b11011;
+					end else if (shift[1]) begin
+						accumulator <= accumulator >>> 2;
+						shift <= shift & 5'b11101;
+					end else if (shift[0]) begin
+						accumulator <= accumulator >>> 1;
+						shift <= shift & 5'b11110;
+					end else begin
+						if (current_order_fb != 0 && ~poly_mode) begin
+							state_mem_write_addr <= current_addr + current_order_ff - 1;
+							state_mem_write_val <= accumulator;
+							state_mem_write_enable <= 1;
+						end
+						state <= STATE_SEND;
+					end
+				end
+				
+				
+				STATE_SEND: begin
+					busy <= 0;
+					
+					req_response <= resul_sat;
+					
+					req_response_valid <= 1;
+					calculating <= 0;
+					calc_cooldown <= 1;
+					state_invalid[handle_r] <= 0;
+					
+					state <= STATE_IDLE;
+				end
+			endcase
+		end
+	end
+endmodule
+
 module filter_unit_svf
 	(
 		input wire clk,
@@ -661,7 +1242,7 @@ module filter_unit_svf
 							state <= STATE_LOAD_WAIT;
 						end
 						
-						data_in_r 	<= pending_req.arg_a << (math_width - data_width);
+						data_in_r 	<= {{(math_width - data_width){pending_req.arg_a[data_width - 1]}}, pending_req.arg_a};// << (math_width - data_width);
 						cutoff_in_r <= pending_req.arg_b << (math_width - data_width);
 						d_in_r 		<= pending_req.arg_c << (math_width - data_width);
 						shift_in_r  <= pending_req.shift;
@@ -751,6 +1332,7 @@ module filter_master
 		input wire alloc_req,
 		
 		input wire coef_write,
+		input wire coef_update,
 		input wire coef_commit,
 		input wire [7:0] coef_write_handle,
 		input wire [data_width - 1 : 0] coef_target,
@@ -793,6 +1375,10 @@ module filter_master
 	
 	wire [data_width - 1 : 0] req_arg_a = active_req.arg_a;
 	wire [data_width - 1 : 0] req_arg_b = active_req.arg_b;
+	wire [data_width - 1 : 0] svf_req_arg_a = svf_req_in.arg_a;
+	wire [data_width - 1 : 0] svf_req_arg_b = svf_req_in.arg_b;
+	wire [data_width - 1 : 0] svf_req_arg_c = svf_req_in.arg_b;
+	wire [data_width - 1 : 0] svf_req_shift = svf_req_in.shift;
 	wire [7 : 0] req_handle = active_req.handle;
 	wire [3:0] req_flags = active_req.flags;
 	wire [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
@@ -805,7 +1391,7 @@ module filter_master
 	wire filter_req_response_valid;
 	wire filter_stuck;
 	
-	filter_unit_normal filters (
+	filter_unit_normal_fixed filters (
 			.clk(clk),
 			.reset(reset),
 			.enable(enable),
@@ -813,12 +1399,8 @@ module filter_master
 			.alloc_req(alloc_req),
 			
 			.coef_write(coef_write),
+			.coef_update(coef_update),
 			.coef_commit(coef_commit),
-			.coef_write_handle(coef_write_handle),
-			.coef_target(coef_target),
-			.coef_data(coef_data),
-			
-			.coef_ack(coef_ack),
 			
 			.req_ack(filter_req_ack),
 			.req_valid(filter_req_valid),

@@ -22,6 +22,7 @@ module control_unit
 		output reg [1:0] block_reg_0_write,
 		output reg [1:0] block_reg_1_write,
 		output reg [1:0] filter_coef_write,
+		output reg [1:0] filter_coef_update,
 		output reg [1:0] filter_coef_commit,
 		input wire [1:0] filter_ack,
 		output reg [1:0] reg_writes_commit,
@@ -197,9 +198,13 @@ module control_unit
 		block_reg_0_write <= 0;
 		block_reg_1_write <= 0;
 		
+		filter_coef_write <= 0;
+		filter_coef_commit <= 0;
+		
 		alloc_delay <= 0;
 		alloc_filter <= 0;
 		filter_coef_write <= 0;
+		filter_coef_update <= 0;
 		
 		set_input_gain  <= 0;
 		set_output_gain <= 0;
@@ -647,35 +652,17 @@ module control_unit
 						
 						`COMMAND_WRITE_FILTER_COEF: begin
 							filter_coef_write[back_pipeline] <= 1;
-							filter_coef_commit[back_pipeline] <= 1;
-							busy_flag <= 1;
-							
-							if (filter_coef_write[back_pipeline] && filter_ack[back_pipeline]) begin
-								state <= READY;
-								filter_coef_write[back_pipeline] <= 0;
-								filter_coef_commit[back_pipeline] <= 0;
-								wait_one <= 1;
-								busy_flag <= 0;
-							end
+							state <= READY;
 						end
 						
 						`COMMAND_UPDATE_FILTER_COEF: begin
-							filter_coef_write[front_pipeline] <= 1;
-							filter_coef_commit[front_pipeline] <= 0;
-							busy_flag <= 1;
-							
-							if (filter_coef_write[front_pipeline] && filter_ack[front_pipeline]) begin
-								state <= READY;
-								filter_coef_write[front_pipeline] <= 0;
-								filter_coef_commit[front_pipeline] <= 0;
-								wait_one <= 1;
-								busy_flag <= 0;
-							end
+							filter_coef_update[front_pipeline] <= 1;
+							state <= READY;
 						end
 						
 						`COMMAND_COMMIT_FILTER_COEF: begin
-							state <= FILTER_COMMIT_WAIT;
 							filter_coef_commit[front_pipeline] <= 1;
+							state <= READY;
 						end
 						
 						`COMMAND_READ: begin

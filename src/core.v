@@ -26,7 +26,7 @@ module dsp_core #(
 		parameter integer acc_width			= 2 * data_width + 8,
 		parameter integer n_blocks			= 256,
 		parameter integer sdram_addr_width 	= 20,
-		parameter integer memory_size		= 1024,
+		parameter integer memory_size		= 8,
 		parameter integer n_channels		= 16
 	) (
 		input wire clk,
