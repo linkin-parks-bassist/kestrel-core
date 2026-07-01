@@ -1378,7 +1378,7 @@ module filter_master
 	wire [data_width - 1 : 0] req_arg_b = active_req.arg_b;
 	wire [data_width - 1 : 0] svf_req_arg_a = svf_req_in.arg_a;
 	wire [data_width - 1 : 0] svf_req_arg_b = svf_req_in.arg_b;
-	wire [data_width - 1 : 0] svf_req_arg_c = svf_req_in.arg_b;
+	wire [data_width - 1 : 0] svf_req_arg_c = svf_req_in.arg_c;
 	wire [data_width - 1 : 0] svf_req_shift = svf_req_in.shift;
 	wire [7 : 0] req_handle = active_req.handle;
 	wire [3:0] req_flags = active_req.flags;

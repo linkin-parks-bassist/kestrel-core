@@ -73,7 +73,7 @@ module gain_controller #(parameter integer data_width, parameter gain_format = 5
 	reg signed [data_width - 1 : 0] out_sample_0_r;
 	reg signed [data_width - 1 : 0] out_sample_1_r;
 	
-	reg signed [data_width - 1 : 0] envelopes_r;
+	reg signed [data_width - 1 : 0] envelopes_r [1:0];
 	
 	assign envelopes_r[0] = envelope_a_r;
 	assign envelopes_r[1] = envelope_b_r;

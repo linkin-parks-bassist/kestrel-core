@@ -107,6 +107,7 @@ module dsp_pipeline #(
 		.data_width(data_width),
 		.n_blocks(n_blocks),
 		.n_channels(`N_CHANNELS),
+		.memory_size(256),
 		.sdram_addr_width(sdram_addr_width)
 	) core (
 		.clk(clk),
