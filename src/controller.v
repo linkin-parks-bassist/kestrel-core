@@ -72,7 +72,7 @@ module control_unit
 	assign flags[6] = cmd_err_flag;
 	assign flags[7] = swapping;
 	
-	assign swap_tail_enable = tail_now;
+	assign swap_tail_enable = tail_next;
 	
 	reg initialised_flag;
 	reg swapping;

@@ -50,6 +50,7 @@ module top
 	/**********/
 	/* Engine */
 	/**********/
+
 	
 	dsp_engine #(
 		.n_blocks(`N_BLOCKS),
@@ -227,7 +228,7 @@ module top
 	// Useful LED indicators (active low)
 	assign led0 = ~pwm_out_1;
 	assign led1 = ~pwm_out_2;
-	assign led3 = ~0;
+	assign led3 = ~mclk_blinker;
 	assign led4 = ~0;
 	
 	wire pwm_out_1;
@@ -261,11 +262,15 @@ module top
 	// I2S
 	wire sample_valid;
 
-	wire [data_width - 1 : 0] sample_out;
-	wire [data_width - 1 : 0] sample_in;
+	wire signed [data_width - 1 : 0] sample_out;
+	wire signed [data_width - 1 : 0] sample_in;
 
-	wire [`SAMPLE_IO_WIDTH - 1 : 0] sample_out_iow;
-	wire [`SAMPLE_IO_WIDTH - 1 : 0] sample_in_iow;
+	wire signed [`SAMPLE_IO_WIDTH - 1 : 0] sample_out_iow;
+	wire signed [`SAMPLE_IO_WIDTH - 1 : 0] sample_out_l_iow = sample_out_iow;
+	wire signed [`SAMPLE_IO_WIDTH - 1 : 0] sample_out_r_iow = sample_out_iow;
+	wire signed [`SAMPLE_IO_WIDTH - 1 : 0] sample_in_iow = (sample_in_l_iow >>> 1) + (sample_in_r_iow >>> 1);
+	wire signed [`SAMPLE_IO_WIDTH - 1 : 0] sample_in_l_iow;
+	wire signed [`SAMPLE_IO_WIDTH - 1 : 0] sample_in_r_iow;
 	
 	generate
 		if (data_width > `SAMPLE_IO_WIDTH) begin
@@ -283,8 +288,8 @@ module top
 	i2s_trx #(.sample_size(`SAMPLE_IO_WIDTH)) i2s_driver (
 		.sys_clk(sys_clk), .bclk(bclk), .lrclk(lrclk), .din(i2s_din), .dout(i2s_dout),
 		.enable(1'b1), .reset(reset), .rx_valid(sample_valid),
-		.tx_l(sample_out_iow), .tx_r(sample_out),
-		.rx_l(sample_in_iow), .rx_r()
+		.tx_l(sample_out_l_iow), .tx_r(sample_out_r_iow),
+		.rx_l(sample_in_l_iow), .rx_r(sample_in_r_iow)
 	);
 	
 	// SPI
