@@ -1,5 +1,6 @@
 #include <time.h>
 #include "sim_main.h"
+#include <verilated_vcd_c.h>
 
 int samples_processed = 0;
 
@@ -87,7 +88,7 @@ static bool write_wav16_mono(const char* path,
 }
 
 
-VerilatedFstC* tfp = NULL;
+VerilatedVcdC* tfp = NULL;
 static uint64_t ticks = 0;
 
 void print_state()
@@ -186,14 +187,16 @@ int schedule_short(uint16_t byte, int when)
 	return append_send_queue(batch, when);
 }
 
+#define DATA_WIDTH 24
+
 int schedule_q15f(float x, int when)
 {
 	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
 	
-	if (x >  1.0 - pow(2.0, -15.0)) x = 1.0 - pow(2.0, -15.0);
+	if (x >  1.0 - pow(2.0, -(float)DATA_WIDTH)) x = 1.0 - pow(2.0, -(float)DATA_WIDTH);
 	if (x < -1.0) x = -1.0;
 	
-	int16_t s = (int16_t)(x * pow(2, 15));
+	int16_t s = (int16_t)(x * pow(2, DATA_WIDTH));
 	
 	kest_fpga_batch_append_16(&batch, s);
 	
@@ -204,7 +207,7 @@ int schedule_qnf(float x, int format, int when)
 {
 	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
 	
-	float sat_max =  pow(2.0, format) - pow(2.0, -15.0 + (float)format);
+	float sat_max =  pow(2.0, format) - pow(2.0, -(float)DATA_WIDTH + (float)format);
 	float sat_min = -pow(2.0, format);
 	
 	if (x > sat_max)
@@ -216,9 +219,15 @@ int schedule_qnf(float x, int format, int when)
 		x = sat_min;
 	}
 	
-	int16_t s = (int16_t)(x * pow(2.0, 15.0 - (float)format));
+	#if DATA_WIDTH == 16
+	int16_t s = (int16_t)(x * pow(2.0, (float)DATA_WIDTH - (float)format - 1));
 	
 	kest_fpga_batch_append_16(&batch, s);
+	#elif DATA_WIDTH == 24
+	int32_t s = (int32_t)(x * pow(2.0, (float)DATA_WIDTH - (float)format - 1));
+	
+	kest_fpga_batch_append_24(&batch, s);
+	#endif
 	
 	return append_send_queue(batch, when);
 }
@@ -234,7 +243,7 @@ void pop_send_queue()
 	
 	//if (ol->batch.buf)
 		//free(ol->batch.buf);
-	free(ol);
+	//free(ol);
 }
 
 int tick()
@@ -311,7 +320,7 @@ int main(int argc, char** argv)
 	Verilated::traceEverOn(true);
 	
 	#ifdef DUMP_WAVEFORM
-	tfp = new VerilatedFstC;
+	tfp = new VerilatedVcdC;
 	dut->trace(tfp, 99);
 	tfp->open("./verilator/waveform.fst");
 	#endif
@@ -326,14 +335,15 @@ int main(int argc, char** argv)
 	{
 		g += 1.0/5.0;
 		
-		printf("%f\n", g);
 		schedule_byte(COMMAND_SET_INPUT_GAIN, 15+i);
 		schedule_qnf(g, 5, 15+i);
 		schedule_byte(COMMAND_SET_OUTPUT_GAIN, 15+i);
 		schedule_qnf(g, 5, 15+i);
 	}
 	
-	kest_effect_desc *test_desc = kest_read_eff_desc_from_file("eff/DMA.EFF");
+	printf("Read test effect...\n");
+	kest_effect_desc *test_desc = kest_read_eff_desc_from_file("eff/DEL.EFF");
+	printf("Done.\n");
 	
 	if (!test_desc)
 	{
@@ -341,58 +351,29 @@ int main(int argc, char** argv)
 		abort();
 	}
 	
-	
-	kest_effect_desc *test_desc2 = kest_read_eff_desc_from_file("eff/GAIN.EFF");
-	
-	if (!test_desc2)
-	{
-		printf("Failed.\n");
-		abort();
-	}
-	
 	kest_effect test_effect;
-	kest_effect test_effect2;
-	kest_effect test_effect3;
-	
 	if (test_desc)   init_effect_from_effect_desc(&test_effect,  test_desc);
-	if (test_desc2)  init_effect_from_effect_desc(&test_effect2, test_desc2);
-	//if (test_desc2)   init_effect_from_effect_desc(&test_effect3, test_desc2);
 	
-	
-	kest_eff_resource_report res = empty_m_eff_resource_report();
-	
-	int pos = 0;
+	kest_effect_ptr_list effects;
+	kest_effect_ptr_list_init(&effects);
+	kest_effect_ptr_list_append(&effects, &test_effect);
 
-	kest_fpga_transfer_batch batch = kest_new_fpga_transfer_batch();
+	kest_fpga_transfer_batch batch = kest_standalone_generate_program_batch(&effects);
 	
-	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
-	kest_fpga_batch_append_effect(&batch, &test_effect, &res, &pos);
 	//kest_fpga_batch_append(&batch, COMMAND_ENABLE_TAIL);
-	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
 	
 	append_send_queue(batch, 16);
-	/*
-	
-	batch = kest_new_fpga_transfer_batch();
+
+	batch.buf = kest_alloc(1024);
+	batch.len = 0;
+	batch.buf_len = 1024;
 	
 	kest_fpga_batch_append(&batch, COMMAND_BEGIN_PROGRAM);
-	kest_fpga_batch_append(&batch, &test_effect2, &res, &pos);
+
 	kest_fpga_batch_append(&batch, COMMAND_END_PROGRAM);
 	
-	append_send_queue(batch, 512);
-	*/
-	
-	for (int i = 0; i < 32; i++)
-	{
-		schedule_byte(COMMAND_READ, 128+16*i);
-		schedule_byte(15, 128+16*i);
-		schedule_byte(0, 128+16*i);
-		schedule_byte(0, 128+16*i);
-		schedule_byte(COMMAND_READOUT, 512+16*i);
-		schedule_byte(COMMAND_READOUT, 512+16*i);
-		schedule_byte(COMMAND_READOUT, 512+16*i);
-		schedule_byte(COMMAND_READOUT, 512+16*i);
-	}
+	append_send_queue(batch, 1024);
+
 	
 	int samples_to_process = (n_samples < MAX_SAMPLES) ? n_samples : MAX_SAMPLES;
 	if (!use_wavs)
@@ -429,10 +410,6 @@ int main(int argc, char** argv)
 						
 						printf("\nSending batch. ");
 						kest_fpga_batch_print(send_queue->batch);
-						
-						#ifdef RUN_EMULATOR
-						sim_handle_transfer_batch(emulator, send_queue->batch);
-						#endif
 					}
 					
 					if (send_queue->position >= send_queue->batch.len)
@@ -450,7 +427,7 @@ int main(int argc, char** argv)
 			samples_processed++;
 			t += sample_duration;
 			
-			io.sample_in = (uint16_t)(roundf((0.5 * sinf(6.28 * 300.0f * t) + 0.25 * sin(6.28 * 200.0f * t)) * 32767.0));
+			io.sample_in = (uint16_t)(roundf((0.5 * sinf(6.28 * 300.0f * t)) * 32767.0));
 			//io.sample_in = (uint16_t)(roundf(sinf(6.28 * 1200.0f * t/* * ((float)samples_processed / (float)samples_to_process)*/) * 32767.0 * expf(-(float)samples_processed * 0.001)));
 			//io.sample_in = static_cast<int16_t>(in_samples[samples_processed]);
 			//io.sample_in = (rand() % 32767) - (1 << 14);

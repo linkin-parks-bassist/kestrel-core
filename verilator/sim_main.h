@@ -19,7 +19,7 @@
 
 #include "sim_io.h"
 
-#define MAX_SAMPLES		(4*1024)
+#define MAX_SAMPLES		(2*1024)
 #define DUMP_WAVEFORM
 
 int tick();
