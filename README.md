@@ -57,12 +57,14 @@ The superproject's `python3 tools/effect_library.py` extends this to a batch of
 compiled arithmetic/SVF/LUT/scratchpad/delay effects, exact comparison with a separate sample model,
 parameter corners, response checks and WAV output. Its reusable core mode is
 `--render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm`, using mono signed PCM16.
-Only the final instruction may write c0; delay allocation is supported and other
-resource programming is rejected. The actual delay unit uses a delayed RAM
+Only the final instruction may write c0; delay and static polynomial allocation/
+coefficient writes are supported. Live coefficient updates and other resource
+programming are rejected. The actual delay unit uses a delayed RAM
 transaction responder, with per-buffer address checks and nonzero initial words.
 `python3 tools/test_eff_delay.py` in the superproject verifies taps, startup fade,
-feedback and buffer isolation, and reproduces a known negative-offset bounds
-defect. Its intended signedness awaits a decision; SDRAM hardware is not modeled.
+feedback and buffer isolation, including minimum-one taps for zero/negative final
+offsets. SDRAM hardware is not modeled. `python3 tools/test_eff_poly.py` verifies
+compiler-programmed quadratic/constant resources over all signed16 inputs.
 The renderer performs full reset before programming and uses the actual LUT
 master and 256-word scratchpad. Run it from this repository so `luts/` resolves.
 The superproject's `python3 tools/test_eff_state.py` checks all input words for
@@ -137,10 +139,10 @@ tap. There is no fractional interpolation, cached prefetch or `delay_mwrite`.
 Writes advance the circular position. Gain starts at zero until the first complete
 buffer traversal, then rises to unity over 256 writes in the 16-bit build.
 
-The current negative-offset address calculation has a bounds defect. The compiled
-regression reproduces a read at address 60 for a 36-word buffer with A=+1, B=−1.
-Negative A is clamped to zero as intended; negative final offsets produced by B
-still need a separate address-handling repair. Fixed/nonnegative taps,
+Final taps clamp to 1..size−1. The write position is the next slot to overwrite,
+so offset 1 reads the latest completed write; offset 0 would read the oldest.
+Negative A clamps to zero, while signed B may shorten the tap but cannot take it
+below one sample. Zero/negative final offsets, fixed/modulated taps,
 startup gain, feedback and isolated buffers have compiled model/RTL coverage using
 a delayed RAM responder. That does not qualify the SDRAM controller or pins.
 

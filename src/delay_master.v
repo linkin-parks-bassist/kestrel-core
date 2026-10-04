@@ -309,7 +309,7 @@ module delay_master #(parameter integer data_width,
 				
 				READ_3: begin
 					delay_addr_delta <= delay + product_a_addr_sh;
-					delay_addr_delta_min <= -$signed(size) + 1;
+					delay_addr_delta_min <= 1;
 					delay_addr_delta_max <= size - 1;
 					state <= READ_4;
 				end

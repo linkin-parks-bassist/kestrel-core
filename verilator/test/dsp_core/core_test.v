@@ -27,6 +27,7 @@ module core_test #(
 		input wire command_reg_1_write,
 		input wire command_instr_write,
         input wire command_alloc_delay,
+        input wire command_alloc_filter, command_filter_coef_write,
 		input wire reg_writes_commit,
 		input wire data_req,
 
@@ -92,7 +93,7 @@ module core_test #(
     wire [15:0] internal_filter_response;
     filter_master filters (
         .clk(clk), .reset(reset), .enable(enable && use_internal_resources),
-        .alloc_req(1'b0), .coef_write(1'b0), .coef_update(1'b0), .coef_commit(1'b0),
+        .alloc_req(command_alloc_filter), .coef_write(command_filter_coef_write), .coef_update(1'b0), .coef_commit(1'b0),
         .coef_write_handle(8'b0), .coef_target(16'b0), .coef_data(18'b0),
         .req_ack(internal_filter_ack), .req_valid(filter_req_valid && use_internal_resources),
         .req_in(filter_req), .req_invalid(debug_filter_invalid),

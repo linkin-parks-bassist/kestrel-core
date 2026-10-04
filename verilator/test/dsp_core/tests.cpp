@@ -156,6 +156,8 @@ static int load_compiled_program(Vcore_test& d, const std::string& path, int blo
     };
     d.reset = 1; wait(d, 4); d.reset = 0;
     int instructions = 0;
+    std::vector<unsigned> polynomial_counts;
+    unsigned polynomial_coefficients = 0;
     d.full_reset = 1; tick(d); d.full_reset = 0;
     int reset_cycles = 0;
     while (d.resetting && reset_cycles++ < 1024) tick(d);
@@ -174,6 +176,25 @@ static int load_compiled_program(Vcore_test& d, const std::string& path, int blo
             d.ctrl_data_in = (size << 24) | delay;
             d.command_alloc_delay = 1; tick(d); d.command_alloc_delay = 0; wait(d, 10);
             require(!d.debug_delay_invalid, "delay allocation rejected");
+            continue;
+        }
+        if (command == 16) {
+            const auto format = take(1), count = take(1), feedback = take(1);
+            require(format <= 17 && count > 0 && feedback == 0, "allocation outside polynomial test profile");
+            require(polynomial_counts.size() < 16 && polynomial_coefficients + count < 128,
+                    "polynomial allocation exceeds test capacity");
+            polynomial_counts.push_back(count);
+            polynomial_coefficients += count;
+            d.ctrl_data_in = (format << 16) | (count << 8) | feedback;
+            d.command_alloc_filter = 1; tick(d); d.command_alloc_filter = 0; wait(d, 12);
+            continue;
+        }
+        if (command == 17) {
+            const auto handle = take(1), target = take(2), value = take(3);
+            require(handle < polynomial_counts.size() && target < polynomial_counts[handle],
+                    "coefficient write outside allocated polynomial");
+            d.ctrl_data_in = (handle << 40) | (target << 24) | value;
+            d.command_filter_coef_write = 1; tick(d); d.command_filter_coef_write = 0; wait(d, 12);
             continue;
         }
         require(command >= 2 && command <= 4, "unsupported programming command");

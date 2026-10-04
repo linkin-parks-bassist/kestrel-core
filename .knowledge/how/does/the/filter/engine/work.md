@@ -1,6 +1,6 @@
 ---
 status: green
-revised_at: "2026-10-04T10:10:45+11:00"
+revised_at: "2026-10-04T13:10:38+11:00"
 ---
 
 filter_master dispatches to three independently compiled units. include/build.vh enables ENABLE_POLYNOMIAL and ENABLE_SVF by default, excluding ENABLE_FILTER. Defining KESTREL_CUSTOM_BUILD permits explicit command-line selection of any combination. The original feed-forward/feedback engine remains in src/filter.v behind ENABLE_FILTER; the Chamberlin unit is behind ENABLE_SVF. src/polynomial.v contains polynomial_unit, extracted from the fixed normal engine with history RAM, feedback and cascaded-filter machinery removed. Polynomial instructions route only to that unit. All enabled coefficient-based units receive the existing allocation/write/update/commit strobes; handles follow allocation order, and polynomial storage reserves the feed-forward coefficient count. Polynomial coefficient writes beyond that count are ignored. The polynomial unit retains the original power-sum fixed-point arithmetic, double coefficient banks, format normalization and output saturation; it also handles a constant polynomial directly. include/defs.vh selects 18-bit coefficients and 16-bit audio/data. src/svf.v remains empty.
@@ -25,6 +25,6 @@ For (b0+b1q+b2q²)/(1+a1q+a2q²), choose f=sqrt(1+a1+a2), d=(1-a2)/f, mH=b2, mB=
 
 Finite RTL ranges, truncation and separate output saturation limit that claim: mixing clipped outputs loses information, and selected cutoff bounds do not realize unrestricted f. Parameters/weights can grow near stability boundaries. Arbitrarily time-varying stability is not proved. Simper's trapezoidal derivation at https://cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf concerns another realization whose costs need evaluation.
 
-verilator/test/polynomial checks signed quadratic and constant results, separate handles, inactive-bank updates and commit isolation. The extracted arithmetic retains the original signed16 power truncation; at input -32768, a squared Q15 power wraps +32768 to -32768. These tests preserve that behavior rather than claiming ideal real-polynomial arithmetic.
+verilator/test/polynomial checks signed quadratic and constant results, separate handles, inactive-bank updates and commit isolation. Superproject tools/test_eff_poly.py checks production compiler allocation/active coefficient writes and quadratic/constant output through the actual core and polynomial unit across all 65,536 signed16 inputs, at most 64 cycles/sample. The compiled renderer supports static programming only; live bank update/commit coverage remains in the separate unit target. The extracted arithmetic retains the original signed16 power truncation; at input -32768, a squared Q15 power wraps +32768 to -32768. These tests preserve that behavior rather than claiming ideal real-polynomial arithmetic.
 
 Sources: David's filter/ISA discussion and Q15 selection; Core filter/instruction/control definitions, actual-unit and compiled-fixture tests; Interface descriptor/resolver/encoder/parser sources; direct numerical/algebraic calculations. Full-system filter qualification remains planned.
