@@ -3,6 +3,7 @@ set -e
 
 verilator -Wall --trace -Wno-fatal \
     --top-module delay_master \
+    -Gdata_width=16 \
     --cc ../../../src/*.v \
     -I../../../src -I../../../include \
     --exe sim_main.cpp tests.cpp \

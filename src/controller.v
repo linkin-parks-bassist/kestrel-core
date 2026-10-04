@@ -55,6 +55,11 @@ module control_unit
 		input wire [31:0] pipeline_data_return [1:0],
 		input wire [1 :0] pipeline_data_return_valid,
 
+        output reg read32_req,
+        output reg [23:0] read32_addr,
+        input wire [31:0] read32_data,
+        input wire read32_valid,
+
 		input wire [63:0] sdram_read_count,
 		input wire [63:0] sdram_write_count,
 
@@ -88,6 +93,7 @@ module control_unit
 	reg data_ready;
 	
 	reg expecting_pipeline_data;
+    reg expecting_read32;
 	reg pipeline_data_req_target;
 	
 	reg returning_data;
@@ -218,6 +224,7 @@ module control_unit
 		pipeline_enables <= 2'b00;
 		
 		pipeline_data_req <= 0;
+        read32_req <= 0;
 		
 		push_command_log <= 0;
 		
@@ -243,7 +250,10 @@ module control_unit
 			timeout_ctr <= 0;
             timeout_max <= `CONTROLLER_TIMEOUT_CYCLES;
             
-            data_ready		  <= 0;
+			data_ready		  <= 0;
+            expecting_read32 <= 0;
+            expecting_pipeline_data <= 0;
+            read32_addr <= 0;
 			returning_data 	  <= 0;
 			readout_n_bytes   <= 0;
 			readout_index 	  <= 0;
@@ -292,6 +302,11 @@ module control_unit
 				expecting_pipeline_data <= 0;
 				data_ready <= 1;
 			end
+            if (expecting_read32 && read32_valid) begin
+                returned_data <= {32'b0, read32_data};
+                expecting_read32 <= 0;
+                data_ready <= 1;
+            end
 			
 			// Ignore 0xFF bytes when not actively recieving data;
 			// they are used for reading the flags, so drain them
@@ -435,6 +450,7 @@ module control_unit
 							`COMMAND_READ: begin
 								bytes_needed <= 1;
 							end
+                            `COMMAND_READ32: bytes_needed <= 3;
 							
 							`COMMAND_CLEAR_TIMEOUT_FLAG: begin
 								timeout_flag <= 0;
@@ -665,7 +681,17 @@ module control_unit
 							state <= READY;
 						end
 						
+                        `COMMAND_READ32: begin
+                            read32_addr <= bytes_in[23:0];
+                            read32_req <= 1;
+                            expecting_read32 <= 1;
+                            expecting_pipeline_data <= 0;
+                            data_ready <= 0;
+                            readout_n_bytes <= 4;
+                            state <= READY;
+                        end
 						`COMMAND_READ: begin
+							expecting_read32 <= 0;
 							ctrl_data_out <= {bytes_in[`CTRL_DATA_BUS_WIDTH - 8 - 1 : 0], data_req_type};
 							
 							case (data_req_type)

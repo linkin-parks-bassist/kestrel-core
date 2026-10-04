@@ -133,16 +133,21 @@ module dsp_core #(
 	
 	reg enable_req_r;
 	reg enable_core;
+	// Same-cycle copies keep branch control local; preserve prevents merging them.
+	reg [`N_INSTR_BRANCHES - 1 : 0] branch_enable /* synthesis syn_preserve=1 */;
+	reg [`N_INSTR_BRANCHES - 1 : 0] branch_resetting /* synthesis syn_preserve=1 */;
 	
 	always @(posedge clk) begin
 		if (reset || full_reset) begin
 			enable_core <= 0;
+			branch_enable <= 0;
 			enable_req_r <= 0;
 		end else begin
 			if (enable)	enable_req_r <= 1;
 			
 			if (enable_req_r && tick) begin
 				enable_core <= 1;
+				branch_enable <= {`N_INSTR_BRANCHES{1'b1}};
 				enable_req_r <= 0;
 			end
 		end
@@ -642,9 +647,9 @@ module dsp_core #(
 	/**************************/
 	madd_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) madd_branch (
 		.clk(clk),
-		.reset(reset | resetting),
+		.reset(reset | branch_resetting[`INSTR_BRANCH_MADD]),
 		
-		.enable(enable_core),
+		.enable(branch_enable[`INSTR_BRANCH_MADD]),
 		
 		.in_valid(out_valid_router[`INSTR_BRANCH_MADD]),
 		.in_ready(in_ready_madd),
@@ -681,9 +686,9 @@ module dsp_core #(
 	/*********************************************/
 	mac_pipeline #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .shift_type(`SHIFT_TYPE_LSH)) mac_branch (
 		.clk(clk),
-		.reset(reset | resetting),
+		.reset(reset | branch_resetting[`INSTR_BRANCH_MAC]),
 		
-		.enable(enable_core),
+		.enable(branch_enable[`INSTR_BRANCH_MAC]),
 		
 		.in_valid(out_valid_router[`INSTR_BRANCH_MAC]),
 		.in_ready(in_ready_mac),
@@ -720,9 +725,9 @@ module dsp_core #(
 	/************************************************/
 	misc_branch #(.data_width(data_width), .n_blocks(n_blocks), .acc_width(acc_width), .n_channels(n_channels)) misc (
 		.clk(clk),
-		.reset(reset | resetting),
+		.reset(reset | branch_resetting[`INSTR_BRANCH_MISC]),
 		
-		.enable(enable_core),
+		.enable(branch_enable[`INSTR_BRANCH_MISC]),
 				
 		.in_valid(out_valid_router[`INSTR_BRANCH_MISC]),
 		.in_ready(in_ready_misc),
@@ -763,9 +768,9 @@ module dsp_core #(
 	
 	rsp_req_str delay_b (
 		.clk(clk),
-		.reset(reset | resetting),
+		.reset(reset | branch_resetting[`INSTR_BRANCH_DELAY]),
 		
-		.enable(enable_core),
+		.enable(branch_enable[`INSTR_BRANCH_DELAY]),
 		
 		.in_valid(out_valid_router[`INSTR_BRANCH_DELAY]),
 		.in_ready(in_ready_delay),
@@ -807,9 +812,9 @@ module dsp_core #(
 	/********/
 	rsp_req_str lut_stage (
 		.clk(clk),
-		.reset(reset | resetting),
+		.reset(reset | branch_resetting[`INSTR_BRANCH_LUT]),
 		
-		.enable(enable_core),
+		.enable(branch_enable[`INSTR_BRANCH_LUT]),
 		
 		.in_valid(out_valid_router[`INSTR_BRANCH_LUT]),
 		.in_ready(in_ready_lut),
@@ -847,9 +852,9 @@ module dsp_core #(
 	/**********/
 	resource_branch #(.data_width(data_width), .handle_width(8), .acc_width(acc_width), .n_channels(n_channels)) mem_stage (
 		.clk(clk),
-		.reset(reset | resetting),
+		.reset(reset | branch_resetting[`INSTR_BRANCH_MEM]),
 		
-		.enable(enable_core),
+		.enable(branch_enable[`INSTR_BRANCH_MEM]),
 		
 		.in_valid(out_valid_router[`INSTR_BRANCH_MEM]),
 		.in_ready(in_ready_mem),
@@ -898,9 +903,9 @@ module dsp_core #(
 	
 	rsp_req_str_filter filter_stage (
 		.clk(clk),
-		.reset(reset | resetting),
+		.reset(reset | branch_resetting[`INSTR_BRANCH_FILT]),
 		
-		.enable(enable_core),
+		.enable(branch_enable[`INSTR_BRANCH_FILT]),
 		
 		.in_valid(out_valid_router[`INSTR_BRANCH_FILT]),
 		.in_ready(in_ready_filt),
@@ -944,7 +949,7 @@ module dsp_core #(
 		for (k = 0; k < `N_INSTR_BRANCHES; k = k + 1) begin : commit_stages
 			if (k != `INSTR_BRANCH_MAC) begin
 				commit_stage #(.data_width(data_width), .n_blocks(n_blocks)) commit_stage_inst
-					(.clk(clk), .enable(enable_core), .reset(reset | resetting), 
+					(.clk(clk), .enable(branch_enable[k]), .reset(reset | branch_resetting[k]),
 					
 					  .in_valid(out_valid_final_stages[k]),  .in_ready(in_ready_commit_stage[k]), 
 					 .out_valid(out_valid_commit_stage[k]),  .out_ready(in_ready_commit_master[k]),
@@ -959,7 +964,7 @@ module dsp_core #(
 	endgenerate
 	
 	commit_stage #(.data_width(acc_width), .n_blocks(n_blocks)) commit_stage_mac
-					(.clk(clk), .enable(enable_core), .reset(reset | resetting), 
+					(.clk(clk), .enable(branch_enable[`INSTR_BRANCH_MAC]), .reset(reset | branch_resetting[`INSTR_BRANCH_MAC]),
 					
 					  .in_valid(out_valid_final_stages[`INSTR_BRANCH_MAC]),  .in_ready(in_ready_commit_stage[`INSTR_BRANCH_MAC]), 
 					 .out_valid(out_valid_commit_stage[`INSTR_BRANCH_MAC]),  .out_ready(in_ready_commit_master[`INSTR_BRANCH_MAC]),
@@ -1183,9 +1188,11 @@ module dsp_core #(
 		if (reset) begin
 			ready <= 1;
 			resetting <= 0;
+			branch_resetting <= 0;
 		end else if (full_reset) begin
 			ready <= 0;
 			resetting <= 1;
+			branch_resetting <= {`N_INSTR_BRANCHES{1'b1}};
 			blk_reset_ctr <= 0;
 			mem_reset_ctr <= 0;
 		end else if (resetting) begin
@@ -1201,6 +1208,7 @@ module dsp_core #(
 			
 			if (mem_reset_ctr >= memory_size && blk_reset_ctr >= n_blocks) begin
 				resetting 	<= 0;
+				branch_resetting <= 0;
 				ready		<= 1;
 			end
 		end else if (enable_core) begin

@@ -2,13 +2,13 @@
 set -e
 
 verilator -Wall --trace -Wno-fatal \
-    --top-module mixer \
+    --top-module postprocessing_stage -Gdata_width=16 \
     --cc ../../../src/*.v \
     -I../../../src -I../../../include \
     --exe sim_main.cpp tests.cpp \
     -CFLAGS "-fpermissive -Wno-error -DTRACE" \
     -LDFLAGS "-lm"
 
-make -C obj_dir -f Vmixer.mk
+make -C obj_dir -f Vpostprocessing_stage.mk
 
-./obj_dir/Vmixer
+./obj_dir/Vpostprocessing_stage

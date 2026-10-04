@@ -326,6 +326,13 @@ module dsp_engine #(
     assign pipeline_data_return_valid[0] = pipeline_a_data_return_valid;
     assign pipeline_data_return_valid[1] = pipeline_b_data_return_valid;
 	
+    wire read32_req, read32_valid;
+    wire [23:0] read32_addr;
+    wire [31:0] read32_data;
+    build_registers build_info (
+        .clk(clk), .reset(reset), .read_req(read32_req), .read_addr(read32_addr),
+        .read_data(read32_data), .read_valid(read32_valid)
+    );
 	control_unit #(.n_blocks(n_blocks), .data_width(data_width)) controller (
 		.clk(clk),
 		.reset(reset),
@@ -368,6 +375,8 @@ module dsp_engine #(
 		.spi_byte_out(spi_byte_out),
 		
 		.pipeline_data_req(pipeline_data_req),
+        .read32_req(read32_req), .read32_addr(read32_addr),
+        .read32_data(read32_data), .read32_valid(read32_valid),
 
 		.pipeline_data_return(pipeline_data_return),
 		.pipeline_data_return_valid(pipeline_data_return_valid),

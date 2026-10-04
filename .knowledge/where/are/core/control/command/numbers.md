@@ -1,10 +1,7 @@
 ---
-status: "unverified"
-created_at: "2026-09-19T23:57:08+10:00"
-scope: "local"
-source: "include/controller.vh"
+status: green
+revised_at: "2026-09-19T23:57:08+10:00"
 ---
-Status: Green
 
 include/controller.vh defines SPI command IDs for programming, block/register writes, delay/filter allocation, gains, commits, readouts, error clearing and tail enable. It also defines data request IDs and a controller timeout.
 

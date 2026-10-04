@@ -360,7 +360,15 @@ module operand_fetch_substage #(parameter integer data_width, parameter n_blocks
 		endcase
 	end
 	
-	wire arg_pending_write = busy_bits[src];
+	// Parallel channel selection avoids a deep variable-index mux on the hazard path.
+	wire [n_channels - 1 : 0] source_busy;
+	genvar channel;
+	generate
+		for (channel = 0; channel < n_channels; channel = channel + 1) begin : source_hazard
+			assign source_busy[channel] = (src == channel) && busy_bits[channel];
+		end
+	endgenerate
+	wire arg_pending_write = |source_busy;
 	wire accumulator_stall = last & accumulator_needed_live & accumulator_busy;
 	wire needs_stall = (arg_needed & ~src_reg & arg_pending_write) | accumulator_stall;
 	wire signed [data_width - 1 : 0] single_cycle_result = src_reg ? reg_value : channels[src];
@@ -698,6 +706,7 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 	wire [$clog2(`N_INSTR_BRANCHES) - 1 : 0] branch_1_out;
 	wire [3:0] flags_1_out;
 	
+	// Fetch C, then B, then A: keep the common A dependency nearest execution.
 	operand_fetch_substage #(.data_width(data_width), .n_blocks(n_blocks), .last(0), .n_channels(n_channels)) fetch_1
 	(
 		.clk(clk),
@@ -751,16 +760,16 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 		.src_c_reg_in (src_c_reg_in),
 		.src_c_reg_out(src_c_reg_1_out),
 		.arg_a_in (),
-		//.arg_a_out(arg_a_1_out),
+		.arg_a_out(arg_a_1_out),
 		.arg_b_in (),
 		.arg_b_out(arg_b_1_out),
 		.arg_c_in (),
-		.arg_c_out(arg_c_1_out),
+		//.arg_c_out(arg_c_1_out),
 		
-		.arg_needed(arg_a_needed_in),
-		.src(src_a_in),
-		.src_reg(src_a_reg_in),
-		.fetched_out(arg_a_1_out),
+		.arg_needed(arg_c_needed_in),
+		.src(src_c_in),
+		.src_reg(src_c_reg_in),
+		.fetched_out(arg_c_1_out),
 		
 		.saturate_disable_in(saturate_disable_in),
 		.saturate_disable_out(saturate_disable_1_out),
@@ -1040,16 +1049,16 @@ module operand_fetch_stage #(parameter integer data_width, parameter n_blocks = 
 		.src_c_reg_in (src_c_reg_2_out),
 		.src_c_reg_out(src_c_reg_3_out),
 		.arg_a_in (arg_a_2_out),
-		.arg_a_out(arg_a_3_out),
+		//.arg_a_out(arg_a_3_out),
 		.arg_b_in (arg_b_2_out),
 		.arg_b_out(arg_b_3_out),
 		.arg_c_in (arg_c_2_out),
-		//.arg_c_out(arg_c_3_out),
+		.arg_c_out(arg_c_3_out),
 		
-		.arg_needed(arg_c_needed_2_out),
-		.src(src_c_2_out),
-		.src_reg(src_c_reg_2_out),
-		.fetched_out(arg_c_3_out),
+		.arg_needed(arg_a_needed_2_out),
+		.src(src_a_2_out),
+		.src_reg(src_a_reg_2_out),
+		.fetched_out(arg_a_3_out),
 
 		.saturate_disable_in(saturate_disable_2_out),
 		.saturate_disable_out(saturate_disable_3_out),

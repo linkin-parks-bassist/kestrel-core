@@ -1,10 +1,7 @@
 ---
-status: "unverified"
-created_at: "2026-09-19T23:57:33+10:00"
-scope: "local"
-source: "src/delay_master.v"
+status: green
+revised_at: "2026-09-19T23:57:33+10:00"
 ---
-Status: Green
 
 `src/delay_master.v` defines `delay_master`. This is the RTL module location; inspect its ports and implementation for behavioral details.
 

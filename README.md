@@ -17,8 +17,52 @@ Implements a pipelined fixed-point, programmable audio processing core targeting
 - Delay buffer controller
 - Simple instruction set
 - Variable fixed-point format controlled by instruction field
-- Arbitrary IIR filter engine
-- Timing closure at 112.5MHz on GW2AR-18 (logic depth 10)
+- Polynomial engine and Chamberlin SVF; optional arbitrary IIR filter engine
+- Targets 112.5MHz on GW2AR-18; timing qualification follows RTL changes
+
+## RTL tests
+
+Install Verilator and a C++ build toolchain, then run `./run_tests.sh`. Pass module
+names to run a subset, for example `./run_tests.sh operand_fetch dsp_core`.
+
+The operand-fetch tests check values, metadata, dependencies, commit IDs,
+backpressure and enable pauses. The core tests execute arithmetic programs through
+the actual decoder, fetch stages, router, execution branches and ordered commit
+across sample boundaries. They print cycles, retirements and fetch-stage busy and
+occupancy counts. To write a cycle trace, run
+`./verilator/test/dsp_core/run.sh /tmp/core-trace.csv`.
+
+For a before/after comparison, save the old `src/operand_fetch.v` outside the
+checkout, then select it with `OPERAND_FETCH_RTL=/absolute/path/operand_fetch.v`
+and use a separate `CORE_TEST_BUILD=/tmp/core-baseline` or
+`OPERAND_FETCH_BUILD=/tmp/fetch-baseline` directory. Both builds use the same tests.
+The fetch-only benchmark uses an eight-cycle writeback sink; the core benchmark
+uses the real arithmetic pipeline.
+
+From the Kestrel superproject, run `./tools/test_eff_readback.sh` to compile the
+Interface's `readback.eff` fixture with the production compiler and execute its
+programming body in the core. This checks `mov`, scratchpad writes, signed
+write-snooping readback, live register updates and ordered channel retirement.
+`./tools/test_eff_svf.sh` compiles the SVF fixture and connects the core to the
+actual filter master. It checks 256 stateful update/read pairs across two private
+states, including expression and channel cutoff inputs. The standalone `svf`
+Verilator target additionally compares 3,840 samples with an integer recurrence
+reference, including cutoff endpoints and different damping formats.
+The script also runs `effects/SVFLP.EFF` for 44,100 samples, comparing every output
+with the integer reference and checking its 100 Hz / 8 kHz low-pass response.
+Pass a WAV filename to retain dry audio on the left and RTL output on the right:
+`./tools/test_eff_svf.sh /tmp/svf.wav`.
+
+The superproject's `python3 tools/effect_library.py` extends this to a batch of
+compiled arithmetic/SVF effects, exact comparison with a separate sample model,
+parameter corners, response checks and WAV output. Its reusable core mode is
+`--render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm`, using mono signed PCM16.
+Only the final instruction may write c0; resource programming is rejected.
+The library guide documents the supported subset and USB deployment.
+
+These harnesses receive programming commands at the core's control strobes. They
+do not exercise SPI framing, the enclosing controller/mixer, the other resource
+engines or physical audio. Full one-pipeline effect verification remains pending.
 
 ## Architecture
 
@@ -77,7 +121,24 @@ There are exactly two block instructions to access delay buffers, on the hardwar
 
 ### Filters
 
-Kestrel Core includes a general-purpose filter engine. It computes arbitrary filters of the form `y[n] = ∑a[n-k]x[n-k] + ∑b[n-l]y[n-l]` at a rate of one multiplication per sample. It is accessed using the instruction `filter`, which simply takes a sample and a handle. Filters are reserved, and their coefficients written, via SPI.
+The default build uses a dedicated polynomial engine and the Chamberlin SVF.
+Polynomial coefficients use the existing allocation/write/update/commit commands;
+the polynomial engine contains no filter-history memory. SVF retains its private,
+once-per-sample state and update/read instruction pairing.
+
+`include/build.vh` controls `ENABLE_FILTER`, `ENABLE_POLYNOMIAL` and `ENABLE_SVF`.
+The original general-purpose IIR engine is retained behind `ENABLE_FILTER` and
+excluded by default. To select flags entirely on the compiler command line, define
+`KESTREL_CUSTOM_BUILD` and the desired `ENABLE_*` macros.
+
+SPI command 40 (`read32`) takes a three-byte address, most significant byte first.
+The controller dispatches it outside itself and uses the existing data-ready and
+`READOUT` mechanism to return four bytes, most significant byte first. Addresses
+are word-aligned: address 0 returns `0x4b455354` ("KEST"); address 4 returns build
+flags, with filter/polynomial/SVF in bits 0/1/2. The default is `0x00000006`.
+Unmapped addresses have no responder. Narrower reads remain future commands.
+Matching firmware adds `fpga-read32 ADDRESS` for diagnosis; automatic instruction
+rejection or conversion based on capabilities remains future work.
 
 ## Instruction Set
 

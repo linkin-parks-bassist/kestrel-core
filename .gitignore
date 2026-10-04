@@ -23,6 +23,9 @@ dude.gprj.user
 *.gprj
 
 /verilator/test/**/obj_dir/
+/verilator/test/**/obj_dir_*/
+/verilator/test/**/obj-build*.log
+/verilator/test/**/obj-lint*.log
 /verilator/test/**/*.vcd
 /verilator/test/**/core
 /verilator/test/**/core.*

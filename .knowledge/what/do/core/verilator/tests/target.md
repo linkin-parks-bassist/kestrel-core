@@ -1,9 +1,23 @@
 ---
-status: "unverified"
-created_at: "2026-09-20T00:08:53+10:00"
-scope: "local"
-source: "run_tests.sh; verilator/test/*/run.sh; src/mixer.v"
+status: green
+revised_at: "2026-10-04T11:38:35+11:00"
 ---
-Status: Green
 
-`run_tests.sh` invokes six Verilator test directories: control_unit, delay_master, filter_master, health_monitor, mixer and multiply_stage. Each script compiles all `src/*.v` with a named top and C++ harness. The mixer script names `mixer` as top, while `src/mixer.v` declares `gain_controller` and `bimultiplier`; that target likely fails until reconciled. This is a static source observation because Verilator is unavailable locally. Source: run_tests.sh; verilator/test/*/run.sh; src/mixer.v
+run_tests.sh discovers eleven Verilator targets; the checked suite passes with Verilator 5.020. The six framework targets retain 39 cases; operand_fetch adds ten workloads, dsp_core has five arithmetic workloads across three sample frames, and svf checks 3,840 sample updates against an integer recurrence.
+
+- operand_fetch checks values, metadata, channel/accumulator dependencies, commit-ID wrap, backpressure and enable pauses with an ordered eight-cycle sink.
+- dsp_core checks actual decode, C → B → A fetch, router, MADD/MISC and ordered channel commit, including input injection, changing samples and commit-ID wrap. It prints cycle/utilization CSV.
+- dsp_core --readback-program FILE consumes the production compiler's programming body through core instruction/register strobes. It checks compiled MOV, scratchpad writes, signed write-snooping responses at +8192/-8192/zero, live register updates, bank synchronization and sequential commit IDs. This fixture uses bounded steady-state windows. Truncated/unsupported commands and an altered register value are rejected.
+- dsp_core --svf-program FILE connects the core to the actual filter_master and checks 256 stateful update/read pairs over 128 sample frames and two private states. The fixture supplies one expression cutoff and one dependent channel cutoff. Checks compare fetched coefficient words/field, audio, channel dependencies and committed low outputs against an integer reference. It does not simulate controller/mixer cadence or physical audio.
+- dsp_core --svf-audio-program FILE OUTPUT.wav runs the compiled superproject effects/SVFLP.EFF for 44,100 samples. Each output is checked against the integer Chamberlin recurrence, including input injection and output to c0. At default 1-kHz cutoff/Q=1/sqrt(2), a 100-Hz/8-kHz two-tone input yields gains 0.998907/0.0194393 after settling. The WAV stores dry left / RTL output right. This fixed test is not a general WAV-input effect simulator or a modulation/stability qualification.
+- dsp_core --render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm loads contiguous instruction/register commands and executes signed PCM16 samples through the actual core and internal filter_master. It rejects unsupported programming commands and requires c0 output within 2551 cycles/sample. The shared batch runner compares every output with a separate sample model, exercises controls and checks selected responses. The superproject example-effects owner records the current library programs, exact-comparison counts and measured costs. Only the final instruction may write c0; resource-programmed delay/LUT/poly/scratchpad, controller/mixer/SPI and converters remain outside this mode. The superproject verification procedure owns batch semantics and physical deployment evidence.
+- svf exercises the actual filter_unit_svf for five cutoff words, three damping/field pairs and two private state slots over repeated traversal. It checks negative/zero/positive cutoff endpoints, signed damping, 18-bit state wrapping and low/high/band output saturation.
+- polynomial checks the extracted polynomial_unit through filter_master: signed quadratic and constant results, repeated requests, separate handles, inactive-bank update and per-handle commit isolation. Its reference retains the original signed16 power truncation.
+- build_registers checks magic, capability masks, pulse clearing and unmapped/unaligned reads for all eight ENABLE_FILTER/POLYNOMIAL/SVF combinations; each combination also elaborates the actual master and enabled engines. This does not numerically qualify the optional normal filter.
+- control_unit checks packed payloads and per-pipeline strobes, programming/live-update rules, register-sync blocking, gains/delay/filter commands and idle FF handling. read32 coverage preserves the full 24-bit address, checks that pipeline reads are not dispatched, waits for a delayed external response, and checks all four MSB-first READOUT bytes.
+- mixer targets composed gains, two-pipeline summation, cancellation and signed saturation in postprocessing_stage.
+- delay_master, health_monitor and multiply_stage use data_width=16. filter_master retains its existing placeholder example; the compiled SVF case supplies substantive SVF/master integration coverage but does not qualify normal-filter behavior.
+
+Superproject tools/test_eff_readback.sh and tools/test_eff_svf.sh build the Interface compiler, compile their fixtures and invoke the corresponding modes; the SVF script also compiles and runs the shipped low-pass and accepts an optional retained WAV path. They validate terminal tail-enable placement without executing SPI framing or controller/mixer tail handling. Other delay/filter/LUT interactions, full one-pipeline simulation and physical audio remain unqualified. Test-only wrappers expose instrumentation without production counters. The throughput owner governs synthetic comparisons; these fixtures are not representative throughput benchmarks.
+
+Sources: run_tests.sh, verilator/test wrappers/harnesses, superproject test scripts, all-eleven-target pass, compiled fixture outputs and prior negative-input checks.

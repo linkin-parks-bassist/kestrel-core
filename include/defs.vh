@@ -11,7 +11,7 @@
 
 `define SPI_FIFO_LENGTH 16
 
-`define ENABLE_SVF
+`include "build.vh"
 `define ENABLE_LUTS
 
 `define N_FILTERS 16

@@ -1,0 +1,28 @@
+`ifndef KESTREL_BUILD_VH
+`define KESTREL_BUILD_VH
+
+// Define KESTREL_CUSTOM_BUILD to select ENABLE_* flags on the compiler command line.
+`ifndef KESTREL_CUSTOM_BUILD
+`define ENABLE_POLYNOMIAL
+`define ENABLE_SVF
+`endif
+
+`define KESTREL_MAGIC 32'h4b455354
+`ifdef ENABLE_FILTER
+`define BUILD_FILTER 32'h00000001
+`else
+`define BUILD_FILTER 32'h00000000
+`endif
+`ifdef ENABLE_POLYNOMIAL
+`define BUILD_POLYNOMIAL 32'h00000002
+`else
+`define BUILD_POLYNOMIAL 32'h00000000
+`endif
+`ifdef ENABLE_SVF
+`define BUILD_SVF 32'h00000004
+`else
+`define BUILD_SVF 32'h00000000
+`endif
+`define BUILD_FLAGS (`BUILD_FILTER | `BUILD_POLYNOMIAL | `BUILD_SVF)
+
+`endif

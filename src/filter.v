@@ -1,6 +1,8 @@
 `include "filter.vh"
 `include "defs.vh"
+`include "controller.vh"
 
+`ifdef ENABLE_FILTER
 module filter_unit_normal
 	(
 		input wire clk,
@@ -1073,6 +1075,9 @@ module filter_unit_normal_fixed
 	end
 endmodule
 
+`endif
+
+`ifdef ENABLE_SVF
 module filter_unit_svf
 	(
 		input wire clk,
@@ -1244,8 +1249,10 @@ module filter_unit_svf
 						end
 						
 						data_in_r 	<= {{(math_width - data_width){pending_req.arg_a[data_width - 1]}}, pending_req.arg_a};// << (math_width - data_width);
-						cutoff_in_r <= pending_req.arg_b << (math_width - data_width);
-						d_in_r 		<= pending_req.arg_c << (math_width - data_width);
+						// Cutoff is nonnegative signed Q15; extra state bits are headroom.
+						cutoff_in_r <= pending_req.arg_b[data_width - 1] ? 0 :
+							{{(math_width - data_width){1'b0}}, pending_req.arg_b};
+						d_in_r <= {{(math_width - data_width){pending_req.arg_c[data_width - 1]}}, pending_req.arg_c};
 						shift_in_r  <= pending_req.shift;
 						
 						prev_block <= pending_req.block;
@@ -1324,6 +1331,8 @@ module filter_unit_svf
 	end
 endmodule
 
+`endif
+
 module filter_master
 	(
 		input wire clk,
@@ -1353,186 +1362,143 @@ module filter_master
         output wire stuck
 	);
 
-	reg pending_target_svf;
-	reg active_target_svf;
-	
-	filter_rw_req_t pending_req;
-	reg req_pending;
-	
-	always @(posedge clk) begin
-		if (req_valid) begin
-			pending_req <= req_in;
-			req_pending <= 1;
-			
-			pending_target_svf <= req_in.flags != `FILTER_REQ_TYPE_FILTER
-							   && req_in.flags != `FILTER_REQ_TYPE_FCASC
-							   && req_in.flags != `FILTER_REQ_TYPE_POLY;
-		end else if (req_ack) begin
-			req_pending <= 0;
-		end
-	end
-	
-	filter_rw_req_t active_req;
-	
-	wire [data_width - 1 : 0] req_arg_a = active_req.arg_a;
-	wire [data_width - 1 : 0] req_arg_b = active_req.arg_b;
-	wire [data_width - 1 : 0] svf_req_arg_a = svf_req_in.arg_a;
-	wire [data_width - 1 : 0] svf_req_arg_b = svf_req_in.arg_b;
-	wire [data_width - 1 : 0] svf_req_arg_c = svf_req_in.arg_c;
-	wire [data_width - 1 : 0] svf_req_shift = svf_req_in.shift;
-	wire [7 : 0] req_handle = active_req.handle;
-	wire [3:0] req_flags = active_req.flags;
-	wire [`BLOCK_ADDR_W - 1 : 0] req_block = active_req.block;
+    filter_rw_req_t pending_req, active_req;
+    reg req_pending, busy;
+    always @(posedge clk) begin
+        if (reset) req_pending <= 0;
+        else if (req_valid) begin
+            pending_req <= req_in;
+            req_pending <= 1;
+        end else if (req_ack) req_pending <= 0;
+    end
 
-	wire filter_req_ack;
-	reg  filter_req_valid;
-	rw_req_t filter_req_in;
-	wire filter_req_invalid;
-	reg [data_width - 1 : 0] filter_req_response;
-	wire filter_req_response_valid;
-	wire filter_stuck;
-	
-	filter_unit_normal_fixed filters (
-			.clk(clk),
-			.reset(reset),
-			.enable(enable),
-			
-			.alloc_req(alloc_req),
-			
-			.coef_write(coef_write),
-			.coef_update(coef_update),
-			.coef_commit(coef_commit),
-			
-			.req_ack(filter_req_ack),
-			.req_valid(filter_req_valid),
-			.req_in(filter_req_in),
-			.req_invalid(filter_req_invalid),
-			.req_response(filter_req_response),
-			.req_response_valid(filter_req_response_valid),
+    rw_req_t normal_req;
+    assign normal_req = '{handle:pending_req.handle, arg_a:pending_req.arg_a,
+        arg_b:pending_req.arg_b, block:pending_req.block, flags:pending_req.flags};
+    reg filter_req_valid, poly_req_valid, svf_req_valid;
+    filter_rw_req_t svf_req_in;
+    wire filter_ack, poly_ack, svf_req_ack;
+    wire filter_valid, poly_valid;
+    wire [data_width-1:0] filter_result, poly_result;
+    wire filter_stuck, poly_stuck;
+    wire svf_req_invalid, svf_low_valid, svf_band_valid, svf_high_valid;
+    wire signed [data_width-1:0] svf_low_out, svf_band_out, svf_high_out;
+    assign stuck = busy && ((active_req.flags == `FILTER_REQ_TYPE_POLY && poly_stuck) ||
+        ((active_req.flags == `FILTER_REQ_TYPE_FILTER || active_req.flags == `FILTER_REQ_TYPE_FCASC) && filter_stuck));
 
-			.ctrl_data_in(ctrl_data_in),
-			
-			.stuck(filter_stuck)
-		);
-	
-	wire svf_req_ack;
-	reg  svf_req_valid;
-	wire svf_req_invalid;
-	filter_rw_req_t svf_req_in;
+`ifdef ENABLE_FILTER
+    filter_unit_normal_fixed filters (
+        .clk(clk), .reset(reset), .enable(enable), .alloc_req(alloc_req),
+        .coef_write(coef_write), .coef_update(coef_update), .coef_commit(coef_commit),
+        .req_ack(filter_ack), .req_valid(filter_req_valid), .req_in(normal_req),
+        .req_invalid(), .req_response(filter_result), .req_response_valid(filter_valid),
+        .ctrl_data_in(ctrl_data_in), .stuck(filter_stuck)
+    );
+`else
+    assign filter_ack = 0;
+    assign filter_valid = 0;
+    assign filter_result = 0;
+    assign filter_stuck = 0;
+`endif
+`ifdef ENABLE_POLYNOMIAL
+    polynomial_unit polynomials (
+        .clk(clk), .reset(reset), .enable(enable), .alloc_req(alloc_req),
+        .coef_write(coef_write), .coef_update(coef_update), .coef_commit(coef_commit),
+        .req_ack(poly_ack), .req_valid(poly_req_valid), .req_in(normal_req),
+        .req_invalid(), .req_response(poly_result), .req_response_valid(poly_valid),
+        .ctrl_data_in(ctrl_data_in), .stuck(poly_stuck)
+    );
+`else
+    assign poly_ack = 0;
+    assign poly_valid = 0;
+    assign poly_result = 0;
+    assign poly_stuck = 0;
+`endif
+`ifdef ENABLE_SVF
+    filter_unit_svf svfs (
+        .clk(clk), .reset(reset), .enable(enable), .req_ack(svf_req_ack),
+        .req_valid(svf_req_valid), .req_invalid(svf_req_invalid), .req_in(svf_req_in),
+        .low_out(svf_low_out), .band_out(svf_band_out), .high_out(svf_high_out),
+        .low_valid(svf_low_valid), .band_valid(svf_band_valid), .high_valid(svf_high_valid)
+    );
+`else
+    assign svf_req_ack = 0;
+    assign svf_req_invalid = 0;
+    assign svf_low_valid = 0;
+    assign svf_band_valid = 0;
+    assign svf_high_valid = 0;
+    assign svf_low_out = 0;
+    assign svf_band_out = 0;
+    assign svf_high_out = 0;
+`endif
 
-	wire svf_low_valid;
-	wire svf_band_valid;
-	wire svf_high_valid;
-	
-	wire signed [data_width - 1 : 0] svf_low_out;
-	wire signed [data_width - 1 : 0] svf_band_out;
-	wire signed [data_width - 1 : 0] svf_high_out;
-	
-	filter_unit_svf svfs (
-			.clk(clk),
-			.reset(reset),
-			.enable(enable),
-			
-			.req_ack(svf_req_ack),
-			.req_valid(svf_req_valid),
-			.req_invalid(svf_req_invalid),
-			.req_in(svf_req_in),
-			
-			.low_out(svf_low_out),
-			.band_out(svf_band_out),
-			.high_out(svf_high_out),
-			
-			.low_valid(svf_low_valid),
-			.band_valid(svf_band_valid),
-			.high_valid(svf_high_valid)
-		);
-	
-	reg busy;
-	
-	always @(posedge clk) begin
-		req_ack <= 0;
-		req_invalid <= 0;
-		req_response_valid <= 0;
-		
-		svf_req_valid <= 0;
-		filter_req_valid <= 0;
-	
-		if (reset) begin
-			busy <= 0;
-		end else if (busy) begin
-			if (active_target_svf) begin
-				if (svf_req_invalid) begin
-					req_invalid <= 1;
-					busy <= 0;
-				end else
-					case (active_req.flags)
-						`FILTER_REQ_TYPE_SVF: begin
-							if (svf_req_ack) begin
-								busy <= 0;
-							end
-						end
-						
-						`FILTER_REQ_TYPE_SVF_LOW: begin
-							if (svf_low_valid) begin
-								req_response <= svf_low_out;
-								req_response_valid <= 1;
-								busy <= 0;
-							end
-						end
-						
-						`FILTER_REQ_TYPE_SVF_BAND: begin
-							if (svf_band_valid) begin
-								req_response <= svf_band_out;
-								req_response_valid <= 1;
-								busy <= 0;
-							end
-						end
-						
-						`FILTER_REQ_TYPE_SVF_HIGH: begin
-							if (svf_high_valid) begin
-								req_response <= svf_high_out;
-								req_response_valid <= 1;
-								busy <= 0;
-							end
-						end
-					endcase
-					if (svf_req_ack) begin
-					busy <= 0;
-				end
-			end else begin
-				if (filter_req_invalid) begin
-					req_invalid <= 1;
-					busy <= 0;
-				end else if (filter_req_response_valid) begin
-					req_response_valid <= 1;
-					req_response <= filter_req_response;
-					busy <= 0;
-				end
-			end
-		end else begin
-			if (req_pending) begin
-				active_req <= pending_req;
-				req_ack <= 1;
-				
-				active_target_svf <= pending_target_svf;
-				
-				busy <= 1;
-				if (pending_target_svf) begin
-					busy <= 1;
-					
-					if (pending_req.flags == `FILTER_REQ_TYPE_SVF) begin
-						svf_req_in <= pending_req;
-						svf_req_valid <= 1;
-					end
-				end else begin
-					filter_req_in.handle <= pending_req.handle;
-					filter_req_in.arg_a  <= pending_req.arg_a;
-					filter_req_in.arg_b  <= pending_req.arg_b;
-					filter_req_in.flags  <= pending_req.flags;
-					filter_req_in.block  <= pending_req.block;
-					filter_req_valid <= 1;
-				end
-			end
-		end
-	end
+    always @(posedge clk) begin
+        req_ack <= 0;
+        req_invalid <= 0;
+        req_response_valid <= 0;
+        filter_req_valid <= 0;
+        poly_req_valid <= 0;
+        svf_req_valid <= 0;
+        coef_ack <= 0;
+        if (reset) busy <= 0;
+        else if (busy) begin
+            case (active_req.flags)
+                `FILTER_REQ_TYPE_FILTER, `FILTER_REQ_TYPE_FCASC:
+                    if (filter_valid) begin
+                        req_response <= filter_result;
+                        req_response_valid <= 1;
+                        busy <= 0;
+                    end
+                `FILTER_REQ_TYPE_POLY:
+                    if (poly_valid) begin
+                        req_response <= poly_result;
+                        req_response_valid <= 1;
+                        busy <= 0;
+                    end
+                `FILTER_REQ_TYPE_SVF:
+                    if (svf_req_ack || svf_req_invalid) begin
+                        req_invalid <= svf_req_invalid;
+                        busy <= 0;
+                    end
+                `FILTER_REQ_TYPE_SVF_LOW, `FILTER_REQ_TYPE_SVF_BAND, `FILTER_REQ_TYPE_SVF_HIGH:
+                    if ((active_req.flags == `FILTER_REQ_TYPE_SVF_LOW && svf_low_valid) ||
+                        (active_req.flags == `FILTER_REQ_TYPE_SVF_BAND && svf_band_valid) ||
+                        (active_req.flags == `FILTER_REQ_TYPE_SVF_HIGH && svf_high_valid)) begin
+                        case (active_req.flags)
+                            `FILTER_REQ_TYPE_SVF_LOW: req_response <= svf_low_out;
+                            `FILTER_REQ_TYPE_SVF_BAND: req_response <= svf_band_out;
+                            default: req_response <= svf_high_out;
+                        endcase
+                        req_response_valid <= 1;
+                        busy <= 0;
+                    end
+                default: busy <= 0;
+            endcase
+        end else if (req_pending) begin
+            active_req <= pending_req;
+            req_ack <= 1;
+            busy <= 1;
+            case (pending_req.flags)
+`ifdef ENABLE_FILTER
+                `FILTER_REQ_TYPE_FILTER, `FILTER_REQ_TYPE_FCASC: filter_req_valid <= 1;
+`endif
+`ifdef ENABLE_POLYNOMIAL
+                `FILTER_REQ_TYPE_POLY: poly_req_valid <= 1;
+`endif
+`ifdef ENABLE_SVF
+                `FILTER_REQ_TYPE_SVF: begin
+                    svf_req_in <= pending_req;
+                    svf_req_valid <= 1;
+                end
+                `FILTER_REQ_TYPE_SVF_LOW, `FILTER_REQ_TYPE_SVF_BAND, `FILTER_REQ_TYPE_SVF_HIGH: ;
+`endif
+                default: begin
+                    req_invalid <= 1;
+                    req_response <= 0;
+                    req_response_valid <= 1;
+                    busy <= 0;
+                end
+            endcase
+        end
+    end
 endmodule

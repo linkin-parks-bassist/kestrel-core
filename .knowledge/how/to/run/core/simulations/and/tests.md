@@ -1,11 +1,18 @@
 ---
-status: "unverified"
-created_at: "2026-09-19T23:57:08+10:00"
-scope: "local"
-source: "run_tests.sh; verilate.sh; run_sim.sh"
+status: green
+revised_at: "2026-10-04T11:15:32+11:00"
 ---
-Status: Green
 
-./run_tests.sh runs every verilator/test/*/run.sh, or selected module names passed as arguments. ./verilate.sh builds top with Verilator and ./run_sim.sh invokes obj_dir/Vtop with input/output WAV paths.
+Run ./run_tests.sh for all verilator/test/*/run.sh targets, or pass selected module names. The eleven targets are build_registers, polynomial, control_unit, dsp_core, delay_master, filter_master, health_monitor, mixer, multiply_stage, operand_fetch and svf. The checked suite passes with Verilator 5.020 and the installed C++ toolchain.
 
-Source: run_tests.sh; verilate.sh; run_sim.sh
+Run ./run_tests.sh polynomial build_registers control_unit for the polynomial/capability/read32 checks. build_registers builds all eight feature-flag combinations and lints their actual engine/master selection; the coverage owner describes the checks.
+
+Core/operand_fetch arithmetic tests print cycle/utilization CSV. Pass an absolute output filename to their run.sh scripts for traces. Select an old operand_fetch.v with OPERAND_FETCH_RTL and separate builds with CORE_TEST_BUILD or OPERAND_FETCH_BUILD for comparisons; the throughput owner describes limits.
+
+From the superproject, ./tools/test_eff_readback.sh compiles the readback fixture to a temporary programming body and invokes dsp_core --readback-program FILE. ./tools/test_eff_svf.sh similarly invokes --svf-program FILE for the SVF fixture, connecting actual core decode/fetch/commit to filter_master and comparing expression/channel coefficient handling and 256 private-state update/read pairs. The SVF script also compiles effects/SVFLP.EFF and runs --svf-audio-program FILE OUTPUT.wav for 44,100 exact-reference samples and a two-tone response check. Supply ./tools/test_eff_svf.sh /tmp/svf.wav to retain dry-left / filtered-right audio; otherwise the WAV and programming bodies are temporary and removed on exit. Run the ordinary dsp_core target separately for its five arithmetic workloads; run the svf target for 3,840 integer-reference samples. The coverage owner specifies their checks and limits.
+
+For reusable arithmetic/SVF rendering, invoke ./verilator/test/dsp_core/run.sh --render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm. PCM is mono signed16 little endian. Only the final instruction may write c0; programming commands other than instruction/register writes and terminal tail-enable are rejected. The superproject python3 tools/effect_library.py supplies production compilation, the independent sample model, exact output comparison, control corners, response checks and dry-left/wet-right WAVs; its verification procedure owns use and limits.
+
+Programming enters through core control strobes; these modes validate tail-enable placement but do not simulate SPI framing or enclosing controller/mixer operation. They do not establish all resources or physical audio. ./verilate.sh and ./run_sim.sh are the older full-top WAV harness: the working library/compiler and focused fixtures do not qualify its C++ integration or full .eff execution.
+
+Sources: run_tests.sh, verilator/test/*/run.sh, superproject test scripts, checked regressions, verilate.sh and run_sim.sh.

@@ -1,13 +1,8 @@
 ---
-status: "unverified"
-created_at: "2026-09-19T23:57:33+10:00"
-scope: "local"
-source: "src/filter.v"
+status: green
+revised_at: "2026-10-04T10:10:48+11:00"
 ---
-Status: Green
 
-`src/filter.v` defines `filter_unit_normal`, `filter_unit_normal_fixed`, `filter_unit_svf`, `filter_master`. This is the RTL module location; inspect its ports and implementation for behavioral details.
+src/filter.v defines filter_unit_normal and filter_unit_normal_fixed under ENABLE_FILTER, filter_unit_svf under ENABLE_SVF, and the always-present filter_master dispatcher. src/polynomial.v defines polynomial_unit under ENABLE_POLYNOMIAL. include/build.vh owns the selections. The filter-engine owner describes their behavior and limitations.
 
-Source: src/filter.v
-
-Source: src/filter.v
+Sources: src/filter.v, src/polynomial.v and include/build.vh.

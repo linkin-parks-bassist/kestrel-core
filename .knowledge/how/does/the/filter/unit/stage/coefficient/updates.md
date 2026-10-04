@@ -1,9 +1,10 @@
 ---
-status: "unverified"
-created_at: "2026-09-20T00:08:16+10:00"
-scope: "local"
-source: "src/filter.v"
+status: green
+revised_at: "2026-10-04T10:10:48+11:00"
 ---
-Status: Green
 
-`src/filter.v` defines normal/fixed filter units with per-handle configuration and coefficient memories. Separate A/B coefficient banks allow writes to the inactive bank and a commit operation to switch the active coefficients; allocation checks filter and memory capacity. The filter engine executes feed-forward and feedback products through a run-state pipeline. Source: src/filter.v
+The enabled normal filter in src/filter.v and polynomial_unit in src/polynomial.v retain per-handle configuration and A/B coefficient memories. Existing SPI allocation and write/update/commit commands reach both enabled units; allocation order supplies handles. Ordinary writes target the active bank, updates target the inactive bank, and commit flips the selected bank for that handle.
+
+The polynomial unit reserves only feed-forward coefficient storage and ignores coefficient indices beyond its allocation. It evaluates powers without filter-history memory. The original general engine retains its feed-forward/feedback history and capacity checks behind ENABLE_FILTER. SVF has private ordinal state and no coefficient allocation or control-written coefficient banks. The filter-engine owner governs build selection and execution.
+
+Sources: src/filter.v and src/polynomial.v; polynomial bank-update/handle-isolation tests.

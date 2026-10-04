@@ -6,12 +6,12 @@
 #include <cstdlib>
 #include <cstdint>
 
-#include "Vmixer.h"
+#include "Vpostprocessing_stage.h"
 #include <verilated_vcd_c.h>
 
 struct Test {
     const char* name;
-    std::function<void(Vmixer*, VerilatedVcdC*)> fn;
+    std::function<void(Vpostprocessing_stage*, VerilatedVcdC*)> fn;
 };
 
 std::vector<Test>& get_tests();
@@ -41,13 +41,13 @@ static inline int64_t bits_s(uint64_t x, unsigned width)
 }
 
 #define TEST(name) \
-    void name(Vmixer*, VerilatedVcdC*); \
+    void name(Vpostprocessing_stage*, VerilatedVcdC*); \
     struct name##_registrar { \
         name##_registrar() { \
             get_tests().push_back({#name, name}); \
         } \
     } name##_registrar_instance; \
-    void name(Vmixer* dut, VerilatedVcdC* tfp)
+    void name(Vpostprocessing_stage* dut, VerilatedVcdC* tfp)
 
 void test_fail_eq(const char* expr_a,
                   const char* expr_b,
@@ -115,5 +115,5 @@ void test_fail_s(const char* expr_a,
         } \
     } while (0)
 
-extern void settle(Vmixer* dut, VerilatedVcdC* tfp);
-extern void tick(Vmixer* dut, VerilatedVcdC* tfp);
+extern void settle(Vpostprocessing_stage* dut, VerilatedVcdC* tfp);
+extern void tick(Vpostprocessing_stage* dut, VerilatedVcdC* tfp);

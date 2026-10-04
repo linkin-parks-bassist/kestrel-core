@@ -1,10 +1,7 @@
 ---
-status: "unverified"
-created_at: "2026-09-19T23:57:08+10:00"
-scope: "local"
-source: "README.md; include/instr_dec.vh"
+status: green
+revised_at: "2026-09-19T23:57:08+10:00"
 ---
-Status: Green
 
 Instructions are 32 bits. Format A includes opcode, format bit, three source selectors, destination, shift and saturation bit. Format B substitutes a resource handle for the third operand and arithmetic fields. Literal opcode and branch assignments are in include/instr_dec.vh.
 

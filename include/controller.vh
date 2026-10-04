@@ -19,6 +19,7 @@
 `define COMMAND_CLEAR_CMD_ERR_FLAG	8'd37
 `define COMMAND_READ				8'd38
 `define COMMAND_ENABLE_TAIL			8'd39
+`define COMMAND_READ32                8'd40
 
 `define DATA_REQ_COMMAND_LOG		8'd33
 
