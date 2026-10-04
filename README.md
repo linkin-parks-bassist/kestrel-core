@@ -132,14 +132,15 @@ capacity and physical timing remain to be qualified.
 The hardware has read and write opcodes. The assembler exposes
 `delay_read $buffer dest`, `delay_mread $buffer a b dest`, and
 `delay_write value $buffer`. Modulation belongs to the read: the unit multiplies
-A/B, scales by buffer size, adds the configured base delay and selects one integer
+A/B after clamping negative A to zero, scales by buffer size, adds the configured base delay and selects one integer
 tap. There is no fractional interpolation, cached prefetch or `delay_mwrite`.
 Writes advance the circular position. Gain starts at zero until the first complete
 buffer traversal, then rises to unity over 256 writes in the 16-bit build.
 
 The current negative-offset address calculation has a bounds defect. The compiled
-regression reproduces a read at address 60 for a 36-word buffer; intended negative
-modulation semantics and its RTL repair remain unresolved. Fixed/nonnegative taps,
+regression reproduces a read at address 60 for a 36-word buffer with A=+1, B=−1.
+Negative A is clamped to zero as intended; negative final offsets produced by B
+still need a separate address-handling repair. Fixed/nonnegative taps,
 startup gain, feedback and isolated buffers have compiled model/RTL coverage using
 a delayed RAM responder. That does not qualify the SDRAM controller or pins.
 

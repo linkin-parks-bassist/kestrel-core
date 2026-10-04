@@ -1,6 +1,6 @@
 ---
 status: green
-revised_at: "2026-10-04T12:24:59+11:00"
+revised_at: "2026-10-04T12:31:15+11:00"
 ---
 
 Delay modulation happens on the read. The Interface assembler exposes delay_read $d dest (zero modulation), delay_mread $d a b dest and delay_write value $d. There is no delay_mwrite. Both read forms use opcode 17; writes use 18 and advance the circular write position.
@@ -9,7 +9,9 @@ delay_master allocates buffers sequentially in its 20-bit word-addressed memory 
 
 Reads multiply signed16 A/B, shift down by 15, multiply by the upper sixteen bits of buffer size, shift down by 11 in the 20-bit-address build, add base delay, then clamp to ±(size−1). The scale drops size's low four bits. Reads use one integer memory address and apply the per-buffer gain to the returned word; there is no interpolation or read-ahead cache.
 
-The request members are unsigned packed words, although the multiplier registers are signed. Consequently arg_a < 1 removes only zero, not negative signed16 bit patterns. The address comparison mixes signed delta and unsigned position. A negative final offset can consequently address outside the allocated buffer: the compiled 36-word buffer with base delay 8, A=−1 and B=+1 reads address 60 at position zero. tools/test_eff_delay.py reproduces this in the actual unit/core with per-handle bounds checks. The sample model rejects that invalid access instead of silently supplying plausible audio. Whether negative A should be clamped or signed offsets should wrap forward is awaiting David's choice; no production RTL repair is selected.
+David requires negative A to be clamped to zero. The unit explicitly interprets the packed A word as signed before comparing it with one; zero and negative A therefore leave the configured base delay unchanged, regardless of B. Independent tap checks cover negative A with both signs of B.
+
+B remains signed. The final offset still clamps to ±(size−1), but its address comparison mixes signed delta and unsigned position. A negative final offset can address outside the allocated buffer: the compiled 36-word buffer with base delay 8, A=+1 and B=−1 reads address 60 at position zero. tools/test_eff_delay.py reproduces this remaining defect in the actual unit/core with per-handle bounds checks. The sample model rejects that invalid access instead of supplying plausible audio. Negative-A clamping does not settle how negative final offsets produced by B should behave; that repair remains separate.
 
 Allocation starts gain at zero. After the first complete traversal, each subsequent write increases gain by 64 toward Q14 unity 16384. This suppresses unwritten memory and fades the delay in over 256 writes. The test responder initializes RAM to nonzero words so zero-initialized simulator memory cannot hide a muting error.
 

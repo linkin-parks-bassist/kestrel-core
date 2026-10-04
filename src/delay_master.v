@@ -268,7 +268,7 @@ module delay_master #(parameter integer data_width,
 								
 								invalid_read <= !buffer_initd[pending_req.handle];
 								
-								mul_a <= pending_req.arg_a < 1 ? 0 : pending_req.arg_a;
+								mul_a <= $signed(pending_req.arg_a) < 1 ? 0 : pending_req.arg_a;
 								mul_b <= pending_req.arg_b;
 								
 								state <= buffer_initd[pending_req.handle] ? READ_1 : IDLE;
