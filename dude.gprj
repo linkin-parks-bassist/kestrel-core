@@ -5,13 +5,10 @@
     <Version>5</Version>
     <Device name="GW2AR-18C" pn="GW2AR-LV18QN88C8/I7">gw2ar18c-000</Device>
     <FileList>
-        <File path="include/controller.vh" type="file.verilog" enable="1"/>
-        <File path="include/core.vh" type="file.verilog" enable="1"/>
-        <File path="include/engine.vh" type="file.verilog" enable="1"/>
-        <File path="include/instr_dec.vh" type="file.verilog" enable="1"/>
-        <File path="include/lut.vh" type="file.verilog" enable="1"/>
+        <File path="src/atypes.v" type="file.verilog" enable="1"/>
         <File path="src/biquad.v" type="file.verilog" enable="1"/>
         <File path="src/branch_router.v" type="file.verilog" enable="1"/>
+        <File path="src/build_registers.v" type="file.verilog" enable="1"/>
         <File path="src/commit_master.v" type="file.verilog" enable="1"/>
         <File path="src/commit_stage.v" type="file.verilog" enable="1"/>
         <File path="src/controller.v" type="file.verilog" enable="1"/>
@@ -21,6 +18,7 @@
         <File path="src/ext_rw.v" type="file.verilog" enable="1"/>
         <File path="src/fifo.v" type="file.verilog" enable="1"/>
         <File path="src/filter.v" type="file.verilog" enable="1"/>
+        <File path="src/polynomial.v" type="file.verilog" enable="1"/>
         <File path="src/gowin_rpll/gowin_rpll.v" type="file.verilog" enable="1"/>
         <File path="src/health_monitor.v" type="file.verilog" enable="1"/>
         <File path="src/i2s.v" type="file.verilog" enable="1"/>
@@ -43,5 +41,8 @@
         <File path="src/top.v" type="file.verilog" enable="1"/>
         <File path="dude.cst" type="file.cst" enable="1"/>
         <File path="dude.sdc" type="file.sdc" enable="1"/>
+        <File path="src/pwm.v" type="file.verilog" enable="1"/>
+        <File path="src/preprocessing.v" type="file.verilog" enable="1"/>
+        <File path="src/postprocessing.v" type="file.verilog" enable="1"/>
     </FileList>
 </Project>

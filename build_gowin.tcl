@@ -1,6 +1,14 @@
 # Run from an empty build directory: gw_sh /path/to/kestrel_core/build_gowin.tcl
 # Generated impl/ outputs are written beneath the working directory.
 set core_root [file dirname [file normalize [info script]]]
+# readmemh paths are relative to the build directory, not the RTL source.
+file mkdir [file join [pwd] luts]
+foreach name {sin_q15_full.hex tanh_q15.hex} {
+    set source [file join $core_root luts $name]
+    if {![file readable $source]} { error "Missing LUT initialization file: $source" }
+    set destination [file normalize [file join [pwd] luts $name]]
+    if {$source ne $destination} { file copy -force $source $destination }
+}
 set_device GW2AR-LV18QN88C8/I7
 add_file [file join $core_root src/atypes.v]
 add_file [file join $core_root src/biquad.v]
