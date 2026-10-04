@@ -54,10 +54,15 @@ Pass a WAV filename to retain dry audio on the left and RTL output on the right:
 `./tools/test_eff_svf.sh /tmp/svf.wav`.
 
 The superproject's `python3 tools/effect_library.py` extends this to a batch of
-compiled arithmetic/SVF/LUT/scratchpad effects, exact comparison with a separate sample model,
+compiled arithmetic/SVF/LUT/scratchpad/delay effects, exact comparison with a separate sample model,
 parameter corners, response checks and WAV output. Its reusable core mode is
 `--render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm`, using mono signed PCM16.
-Only the final instruction may write c0; resource programming is rejected.
+Only the final instruction may write c0; delay allocation is supported and other
+resource programming is rejected. The actual delay unit uses a delayed RAM
+transaction responder, with per-buffer address checks and nonzero initial words.
+`python3 tools/test_eff_delay.py` in the superproject verifies taps, startup fade,
+feedback and buffer isolation, and reproduces a known negative-offset bounds
+defect. Its intended signedness awaits a decision; SDRAM hardware is not modeled.
 The renderer performs full reset before programming and uses the actual LUT
 master and 256-word scratchpad. Run it from this repository so `luts/` resolves.
 The superproject's `python3 tools/test_eff_state.py` checks all input words for
@@ -119,9 +124,24 @@ This makes available a kilobyte or so of SRAM, which can be used to store and re
 
 #### Delay buffers
 
-There is a dedicated delay buffer controller, with a fixed number of slots, which manages allocation, addressing, reading and writing to delay buffers. Delay buffers are allocated via a dedicated SPI command. The intention is that these will be allocated in the 8MB SDRAM integrated in the GW2AR-18, but, at the time of writing, the SDRAM controller has not been connected, and the delay buffer controller allocates in a small BSRAM, with a maximum total delay of 370ms at 16b, 44.1kHz. Delay buffers acquire handles according to the order of allocation.
+The dedicated delay controller allocates buffers sequentially and gives them handles
+in allocation order. Each pipeline connects its delay controller to the shared
+SDRAM interface, which is wired to the controller at the top level. Actual SDRAM
+capacity and physical timing remain to be qualified.
 
-There are exactly two block instructions to access delay buffers, on the hardware level. `delay_read` simply fetches a cached value. `delay_mwrite` takes three arguments; one is a sample to write, one is the *modulation argument*, and the third is a handle. The assembler recognises a third instruction, `delay_write`, which is simply the special case where the modulation argument is 0. This instruction writes the given sample to the buffer, advances its position, and adds the modulation coefficient, considered in q8.8, to the stored delay offset. Following a write, the delay buffer controller automatically fetches and caches the sample to be returned on the next `delay_read`, according to the updated (fractional) delay offset. The modulation argument allows for modulation of delay, enabling effects such as phasers and flangers, and the prefetch mechanism obviates any concerns with respect to the (variable) latency of SDRAM.
+The hardware has read and write opcodes. The assembler exposes
+`delay_read $buffer dest`, `delay_mread $buffer a b dest`, and
+`delay_write value $buffer`. Modulation belongs to the read: the unit multiplies
+A/B, scales by buffer size, adds the configured base delay and selects one integer
+tap. There is no fractional interpolation, cached prefetch or `delay_mwrite`.
+Writes advance the circular position. Gain starts at zero until the first complete
+buffer traversal, then rises to unity over 256 writes in the 16-bit build.
+
+The current negative-offset address calculation has a bounds defect. The compiled
+regression reproduces a read at address 60 for a 36-word buffer; intended negative
+modulation semantics and its RTL repair remain unresolved. Fixed/nonnegative taps,
+startup gain, feedback and isolated buffers have compiled model/RTL coverage using
+a delayed RAM responder. That does not qualify the SDRAM controller or pins.
 
 ### Filters
 
@@ -172,7 +192,7 @@ The assembly language, as implemented by [Kestrel Interface](https://github.com/
 | `mem_write`   | `mem_write c4 $y2`            |       |
 | `delay_read`  | `delay_read $delay1 c3`       |       |
 | `delay_write` | `delay_write c0 $delay1`      |       |
-| `delay_mwrite`| `delay_mwrite c0 c4 $delay2`  |       |
+| `delay_mread` | `delay_mread $delay2 c4 [0.1] c3` | Read-side modulation |
 | `filter`      | `filter c0 $bq1 c1`           |       |
 
 ## Instruction Encoding

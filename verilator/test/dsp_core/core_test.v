@@ -26,6 +26,7 @@ module core_test #(
 		input wire command_reg_0_write,
 		input wire command_reg_1_write,
 		input wire command_instr_write,
+        input wire command_alloc_delay,
 		input wire reg_writes_commit,
 		input wire data_req,
 
@@ -77,6 +78,13 @@ module core_test #(
         output wire [7:0] debug_svf_block,
         output wire debug_filter_invalid,
         output wire debug_lut_invalid,
+        output wire debug_delay_invalid, debug_delay_busy,
+        output wire delay_mem_req, delay_mem_write,
+        output wire [7:0] delay_mem_handle,
+        output wire [19:0] delay_mem_addr,
+        output wire [15:0] delay_mem_data_out,
+        input wire [15:0] delay_mem_data_in,
+        input wire delay_mem_read_valid, delay_mem_write_ack,
         output wire [15:0] stuck_flags
 	);
 
@@ -105,7 +113,31 @@ module core_test #(
         .req_in(lut_req), .req_invalid(debug_lut_invalid),
         .req_response(internal_lut_response), .req_response_valid(internal_lut_response_valid)
     );
+    wire internal_delay_ack, internal_delay_response_valid, delay_invalid_read, delay_invalid_write;
+    wire delay_invalid_alloc, delay_invalid_request;
+    wire [15:0] internal_delay_response;
+    delay_master #(.data_width(data_width), .addr_width(sdram_addr_width)) delays (
+        .clk(clk), .reset(reset | full_reset), .enable(enable && use_internal_resources),
+        .alloc_req(command_alloc_delay), .ctrl_data_in(ctrl_data_in),
+        .req_in(delay_req), .req_valid(delay_req_valid && use_internal_resources),
+        .req_ack(internal_delay_ack), .req_invalid(delay_invalid_request),
+        .req_response(internal_delay_response), .req_response_valid(internal_delay_response_valid),
+        .mem_req(delay_mem_req), .mem_req_type(delay_mem_write), .mem_addr(delay_mem_addr),
+        .mem_data_in(delay_mem_data_in), .mem_data_out(delay_mem_data_out),
+        .mem_read_valid(delay_mem_read_valid), .mem_write_ack(delay_mem_write_ack),
+        .invalid_read(delay_invalid_read), .invalid_write(delay_invalid_write),
+        .invalid_alloc(delay_invalid_alloc), .any_buffers(),
+        .data_req(1'b0), .data_return(), .data_return_valid(), .stuck()
+    );
+    assign delay_mem_handle = delays.active_req.handle;
+    assign debug_delay_invalid = delay_invalid_read | delay_invalid_write | delay_invalid_alloc;
+    assign debug_delay_busy = delays.req_pending | delay_req_valid | !dut.in_ready_delay
+                           | (delays.state != 0 && delays.state != 16);
     dsp_core #(.data_width(data_width), .n_blocks(n_blocks), .memory_size(memory_size), .n_channels(n_channels)) dut (
+        .delay_req_ack(use_internal_resources ? internal_delay_ack : delay_req_ack),
+        .delay_req_invalid(use_internal_resources ? delay_invalid_request : delay_req_invalid),
+        .delay_req_response_valid(use_internal_resources ? internal_delay_response_valid : delay_req_response_valid),
+        .delay_req_response(use_internal_resources ? internal_delay_response : delay_req_response),
         .lut_req_ack(use_internal_resources ? internal_lut_ack : lut_req_ack),
         .lut_req_invalid(use_internal_resources ? debug_lut_invalid : lut_req_invalid),
         .lut_req_response_valid(use_internal_resources ? internal_lut_response_valid : lut_req_response_valid),

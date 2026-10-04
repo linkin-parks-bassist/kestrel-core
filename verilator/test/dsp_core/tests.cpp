@@ -9,15 +9,48 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <utility>
 
 // Raw arithmetic programs exercise the actual decode/fetch/router/branches/commit.
-// Arithmetic runs disable resource requests; compiled renders use filter_master and lut_master.
+// Arithmetic runs disable resource requests; compiled renders use filter_master, lut_master and delay_master.
 // These tests do not simulate converters, SDRAM or SPI.
 struct Instruction { uint32_t word; int reg0 = 1, reg1 = 1, dest = 1, expected = 0; bool depends_on_sample = false; };
 static void require(bool ok, const std::string& message) {
     if (!ok) throw std::runtime_error(message);
 }
-static void tick(Vcore_test& d) { d.clk = 0; d.eval(); d.clk = 1; d.eval(); d.clk = 0; d.eval(); }
+static void tick(Vcore_test& d) {
+    // Delayed transaction responder, not a model of the SDRAM controller/pins.
+    // Nonzero initial words expose startup muting errors instead of hiding them.
+    static std::vector<int16_t> memory(1 << 20, 0x5a5a);
+    static int pending = 0, address = 0, value = 0, transactions = 0;
+    static bool writing = false;
+    static std::vector<std::pair<int,int>> buffers;
+    d.clk = 0; d.eval();
+    d.delay_mem_read_valid = d.delay_mem_write_ack = 0;
+    if (d.reset || d.full_reset) { pending = 0; buffers.clear(); }
+    else {
+        if (d.command_alloc_delay) {
+            const int start = buffers.empty() ? 0 : buffers.back().second;
+            const int size = (d.ctrl_data_in >> 24) & 0xfffff;
+            buffers.emplace_back(start, start + size);
+        }
+        if (pending && --pending == 0) {
+            if (writing) { memory[address] = value; d.delay_mem_write_ack = 1; }
+            else { d.delay_mem_data_in = uint16_t(memory[address]); d.delay_mem_read_valid = 1; }
+        }
+        if (d.delay_mem_req) {
+            require(!pending, "overlapping delay memory transactions");
+            address = d.delay_mem_addr; value = d.delay_mem_data_out;
+            require(d.delay_mem_handle < buffers.size(), "unallocated delay memory handle");
+            const auto bounds = buffers[d.delay_mem_handle];
+            require(address >= bounds.first && address < bounds.second,
+                    "delay access outside its buffer: " + std::to_string(address));
+            writing = d.delay_mem_write;
+            pending = 3 + (transactions++ % 9);
+        }
+    }
+    d.eval(); d.clk = 1; d.eval(); d.clk = 0; d.eval();
+}
 static void wait(Vcore_test& d, int n) { while (n--) tick(d); }
 static uint32_t encode(int op, int a, int b, int c, int dest, int shift = 15) {
     return uint32_t(op) | (a << 6) | (b << 11) | (c << 16) | (dest << 21) | (shift << 25);
@@ -135,6 +168,14 @@ static int load_compiled_program(Vcore_test& d, const std::string& path, int blo
             tail = true;
             break;
         }
+        if (command == 5) {
+            const auto size = take(3), delay = take(3);
+            require(size > 0 && size < (1 << 20) && delay < size, "delay allocation outside test profile");
+            d.ctrl_data_in = (size << 24) | delay;
+            d.command_alloc_delay = 1; tick(d); d.command_alloc_delay = 0; wait(d, 10);
+            require(!d.debug_delay_invalid, "delay allocation rejected");
+            continue;
+        }
         require(command >= 2 && command <= 4, "unsupported programming command");
         const auto block = take(2);
         require(block < 256, "block outside test core");
@@ -156,12 +197,12 @@ static int load_compiled_program(Vcore_test& d, const std::string& path, int blo
     return instructions;
 }
 // A reusable one-core audio loop. Resource coverage is deliberately explicit:
-// arithmetic, scratchpad and actual SVF/LUT masters, without SPI, mixer or SDRAM.
+// arithmetic, scratchpad and actual SVF/LUT/delay masters, without SPI, mixer or SDRAM hardware.
 static void render_program(const std::string& path, const std::string& input_path,
                            const std::string& output_path) {
     Vcore_test d;
-    load_compiled_program(d, path);
     d.use_internal_resources = 1;
+    load_compiled_program(d, path);
     d.enable = 1; wait(d, 4);
     std::ifstream input(input_path, std::ios::binary);
     std::ofstream output(output_path, std::ios::binary);
@@ -178,7 +219,7 @@ static void render_program(const std::string& path, const std::string& input_pat
         bool written = false;
         int cycles = 0;
         while (!written && cycles < 2551) {
-            require(!d.debug_filter_invalid && !d.debug_lut_invalid && !d.stuck_flags, "audio invalid resource/stuck");
+            require(!d.debug_filter_invalid && !d.debug_lut_invalid && !d.debug_delay_invalid && !d.stuck_flags, "audio invalid resource/stuck");
             // Cycle zero is the input injection. Programs must only write c0
             // at their final instruction; intermediate channels hold work.
             if (cycles && d.write_channel && d.write_dest == 0) {
@@ -188,6 +229,8 @@ static void render_program(const std::string& path, const std::string& input_pat
             }
             tick(d); ++cycles;
         }
+        while (d.debug_delay_busy && cycles < 2551) { tick(d); ++cycles; }
+        require(!d.debug_delay_busy, "delay did not drain before next sample");
         require(written, "audio sample budget exceeded at frame " + std::to_string(frames));
         max_cycles = std::max(max_cycles, cycles);
         ++frames;

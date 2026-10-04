@@ -1,22 +1,22 @@
 ---
 status: green
-revised_at: "2026-10-04T10:54:39+11:00"
+revised_at: "2026-10-04T12:24:59+11:00"
 ---
 
-Delay modulation happens on the read, not the write. The Interface assembler exposes three forms:
+Delay modulation happens on the read. The Interface assembler exposes delay_read $d dest (zero modulation), delay_mread $d a b dest and delay_write value $d. There is no delay_mwrite. Both read forms use opcode 17; writes use 18 and advance the circular write position.
 
-- delay_read $d dest: read the configured delay, with modulation argument A fixed at zero.
-- delay_mread $d a b dest: read using a modulated offset.
-- delay_write value $d: store one sample and advance the circular write position.
+delay_master allocates buffers sequentially in its 20-bit word-addressed memory space. Allocation carries size and base delay as two 24-bit programming fields, truncated to the implemented address width. The firmware compiler converts requested units to samples, enforces at least delay+4 words, and adds 4−(size%4), including four words when already divisible by four. The declared 32-word/8-sample fixture therefore programs 36 words.
 
-There is no delay_mwrite in the current assembler. delay_read and delay_mread share BLOCK_INSTR_DELAY_READ; delay_write uses BLOCK_INSTR_DELAY_WRITE.
+Reads multiply signed16 A/B, shift down by 15, multiply by the upper sixteen bits of buffer size, shift down by 11 in the 20-bit-address build, add base delay, then clamp to ±(size−1). The scale drops size's low four bits. Reads use one integer memory address and apply the per-buffer gain to the returned word; there is no interpolation or read-ahead cache.
 
-For a read, delay_master multiplies the modulation operands after replacing negative A with zero, scales the result by buffer size, adds the configured base delay, and clamps the offset to the buffer. It computes one integer memory address, waits for one returned sample, applies the per-buffer gain and returns the result. READ_1 through READ_9, including READ_2_5 and the memory wait, implement this path. It does not interpolate between adjacent samples or keep a read-ahead cache. Consequently smooth changes to an expression need not produce a smoothly interpolated delay tap. Fractional-delay interpolation could be an implementation change without necessarily adding opcodes; no such change is selected.
+The request members are unsigned packed words, although the multiplier registers are signed. Consequently arg_a < 1 removes only zero, not negative signed16 bit patterns. The address comparison mixes signed delta and unsigned position. A negative final offset can consequently address outside the allocated buffer: the compiled 36-word buffer with base delay 8, A=−1 and B=+1 reads address 60 at position zero. tools/test_eff_delay.py reproduces this in the actual unit/core with per-handle bounds checks. The sample model rejects that invalid access instead of silently supplying plausible audio. Whether negative A should be clamped or signed offsets should wrap forward is awaiting David's choice; no production RTL repair is selected.
 
-Writes carry A as the sample and advance position after storing it. They finish through the resource branch's write acknowledgement rather than receiving a commit ID or passing through commit_master. Preserve ordering when evaluating read/write behavior; do not assume commit_master orders those writes.
+Allocation starts gain at zero. After the first complete traversal, each subsequent write increases gain by 64 toward Q14 unity 16384. This suppresses unwritten memory and fades the delay in over 256 writes. The test responder initializes RAM to nonzero words so zero-initialized simulator memory cannot hide a muting error.
 
-The instruction descriptors currently assign numeric_audio to both delay read forms and delay_write. David accepts the delay ISA and does not want an exact-offset read instruction. He has tested current modulation for flanging and likes its sound. Recommend against long-delay modulation because quantization becomes objectionable; the operation remains permitted, without promising good sound. A possible improvement in 24-bit mode is unverified. Fractional delay is a future feature, not prerequisite to the effect library.
+Writes do not go through commit_master: the resource branch advances after request acceptance, while delay_master waits for the memory write acknowledgement before accepting its next operation. Preserve the serialized delay-unit order. The renderer drains outstanding delay work before the next simulated sample and includes that drain in its cycle cost.
 
-Core README, eff/flanger.eff and the instruction table retain older descriptions of delay_mwrite, write-side modulation or different operand counts. Treat the assembler descriptors and RTL as evidence of current behavior, not those examples.
+Compiled tests check fixed taps/startup gain independently, modulation whose final offset remains nonnegative, paired isolated allocations, and half-gain feedback against an independent recurrence. A delayed RAM transaction responder varies completion over 3–11 clocks. It is not a simulation of the SDRAM controller, arbiter, pins or physical timing.
 
-Sources: src/delay_master.v IDLE/READ_1–READ_9/write states, src/instr_dec.v and src/ext_rw.v; Interface components/fpga/kest_fpga_instr.c and components/parser/kest_asm_parser.c; David's current ISA/delay guidance. SDRAM wiring and integration limits belong to what/is/the/current/sdram/data/path.md and what/is/the/status/of/sdram/delay/integration.md.
+David accepts the delay ISA, has enjoyed its flanging, and does not want an exact-offset read instruction. Long-delay modulation remains permitted but discouraged because integer tap quantization becomes objectionable. Fractional interpolation is future work; 24-bit improvement remains unqualified. Older eff/flanger.eff retains obsolete write-modulation syntax and is outside the verified batch; README, assembler and RTL describe the current read-modulation forms.
+
+Sources: src/atypes.v, src/delay_master.v, src/instr_dec.v, src/ext_rw.v; Interface components/fpga/kest_fpga_instr.c and kest_fpga_encoding.c; compiled fixtures and tools/test_eff_delay.py. Source wiring and physical integration limits belong to the SDRAM data-path/integration owners.
