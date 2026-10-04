@@ -1,11 +1,11 @@
 ---
 status: green
-revised_at: "2026-10-04T11:21:53+11:00"
+revised_at: "2026-10-04T11:56:59+11:00"
 ---
 
 The remaining RTL work is governed by what/is/the/spec.md and the superproject how/to/work/on/kestrel.md: preserve the distilled system shape, keep production changes minimal, and measure consequences. David accepts the current ISA and now prioritizes the effect library and its verification/deployment loop. The earlier barrel-shifter-before-branch staging remains for the other execution-path changes. The current routed image meets the existing timing constraint with a narrow margin; retain the clock/constraints. Other staging remains provisional.
 
-Next extend the working arithmetic/SVF actual-core renderer to delay, LUT, polynomial and scratchpad resource programming and dynamic controls; the superproject owns authored effects and their verification loop. DSP shift mapping remains future work; discuss any resulting arithmetic or stage changes with David. Keep Tang USB-C disconnected while external carrier power is present. Extend modulation/overload qualification as needed; qualitative low-cutoff sound and smooth control are already established for the prior paired Q15 image, owned by the filter-engine leaf.
+Next extend the working arithmetic/SVF/built-in-LUT/scratchpad actual-core renderer to delay, polynomial and allocated resource programming and dynamic controls; the superproject owns authored effects and their verification loop. DSP shift mapping remains future work; discuss any resulting arithmetic or stage changes with David. Keep Tang USB-C disconnected while external carrier power is present. Extend modulation/overload qualification as needed; qualitative low-cutoff sound and smooth control are already established for the prior paired Q15 image, owned by the filter-engine leaf.
 
 1. Define capability-aware firmware acceptance and lowering with David: probe magic/build bits, reject unsupported operations, and assess classic biquad conversion to SVF against finite coefficient/output ranges. Preserve the accepted instruction/filter contract. Preserve the private-state Chamberlin pairing; externally configured damping and a replacement recurrence remain unselected.
 2. Extend utilization comparisons to compiled representative .eff instruction streams, especially long A dependency chains, using the shared effect verification loop. Use the working Interface host compiler and extend the focused compiler-to-core readback path to representative effect programs. Keep complete cycle timelines, dependency-busy cycles, useful retirements per cycle, sample-budget headroom and stage occupancy; how/to/measure/core/instruction/throughput.md owns the current synthetic baseline and limits.

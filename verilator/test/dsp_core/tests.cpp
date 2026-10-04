@@ -11,7 +11,7 @@
 #include <vector>
 
 // Raw arithmetic programs exercise the actual decode/fetch/router/branches/commit.
-// Arithmetic runs disable resource requests; the compiled SVF case uses filter_master.
+// Arithmetic runs disable resource requests; compiled renders use filter_master and lut_master.
 // These tests do not simulate converters, SDRAM or SPI.
 struct Instruction { uint32_t word; int reg0 = 1, reg1 = 1, dest = 1, expected = 0; bool depends_on_sample = false; };
 static void require(bool ok, const std::string& message) {
@@ -123,6 +123,10 @@ static int load_compiled_program(Vcore_test& d, const std::string& path, int blo
     };
     d.reset = 1; wait(d, 4); d.reset = 0;
     int instructions = 0;
+    d.full_reset = 1; tick(d); d.full_reset = 0;
+    int reset_cycles = 0;
+    while (d.resetting && reset_cycles++ < 1024) tick(d);
+    require(d.ready && !d.resetting, "full reset did not clear program/state");
     bool tail = false;
     while (cursor < bytes.size()) {
         const auto command = take(1);
@@ -152,12 +156,12 @@ static int load_compiled_program(Vcore_test& d, const std::string& path, int blo
     return instructions;
 }
 // A reusable one-core audio loop. Resource coverage is deliberately explicit:
-// arithmetic and the actual SVF/filter master, without SPI, mixer or SDRAM.
+// arithmetic, scratchpad and actual SVF/LUT masters, without SPI, mixer or SDRAM.
 static void render_program(const std::string& path, const std::string& input_path,
                            const std::string& output_path) {
     Vcore_test d;
     load_compiled_program(d, path);
-    d.use_internal_filter = 1;
+    d.use_internal_resources = 1;
     d.enable = 1; wait(d, 4);
     std::ifstream input(input_path, std::ios::binary);
     std::ofstream output(output_path, std::ios::binary);
@@ -174,7 +178,7 @@ static void render_program(const std::string& path, const std::string& input_pat
         bool written = false;
         int cycles = 0;
         while (!written && cycles < 2551) {
-            require(!d.debug_filter_invalid && !d.stuck_flags, "audio invalid resource/stuck");
+            require(!d.debug_filter_invalid && !d.debug_lut_invalid && !d.stuck_flags, "audio invalid resource/stuck");
             // Cycle zero is the input injection. Programs must only write c0
             // at their final instruction; intermediate channels hold work.
             if (cycles && d.write_channel && d.write_dest == 0) {
@@ -245,7 +249,7 @@ static int16_t saturate16(int32_t value) {
 static void run_svf_program(const std::string& path) {
     Vcore_test d;
     load_compiled_program(d, path, 4);
-    d.use_internal_filter = 1;
+    d.use_internal_resources = 1;
     d.enable = 1; wait(d, 4);
     d.sample_in = 16384;
     d.tick = 1; tick(d); d.tick = 0;
@@ -291,7 +295,7 @@ static void run_svf_program(const std::string& path) {
 static void run_svf_audio_program(const std::string& path, const std::string& wav_path) {
     Vcore_test d;
     load_compiled_program(d, path, 2);
-    d.use_internal_filter = 1;
+    d.use_internal_resources = 1;
     d.enable = 1; wait(d, 4);
     constexpr int rate = 44100, frames = rate;
     constexpr double pi = 3.14159265358979323846;

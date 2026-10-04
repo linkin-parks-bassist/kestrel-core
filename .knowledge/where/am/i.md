@@ -1,11 +1,11 @@
 ---
 status: green
-revised_at: "2026-10-04T10:47:46+11:00"
+revised_at: "2026-10-04T11:59:45+11:00"
 ---
 
 Kestrel Core is the FPGA DSP engine for the pedal, targeting Gowin GW2AR. `src` contains Verilog top-level, dual-engine processing, instruction pipeline, commit logic, mixer, resource engines and I/O. `include` holds opcode, command and configuration headers; `verilator` has simulation harnesses and unit tests; `luts` holds LUT data and `eff` example programs.
 
-`what/is/the/spec.md` owns intended C → B → A operand fetching, hardware barrel shifting, deferred shorter MOV and ADD/SUB paths, branch reconsideration, SCK-clocked SPI and envelope/filter/AGC post-processing; `what/is/the/plan.md` stages remaining implementation and automated Verilator testing. The superproject owns the shared .eff simulation and physical HIL contract; a one-pipeline simulation is required alongside its lightweight DSP model.
+`what/is/the/spec.md` owns intended C → B → A operand fetching, hardware barrel shifting, deferred shorter MOV and ADD/SUB paths, branch reconsideration, SCK-clocked SPI and envelope/filter/AGC post-processing; `what/is/the/plan.md` stages remaining implementation and automated Verilator testing. The actual-core renderer covers arithmetic, private-state SVF, built-in LUTs and 256-word scratchpad reads/writes, with exhaustive LUT and persistent-state fixtures; its tests owner specifies coverage. The superproject owns the shared .eff simulation and physical HIL contract; a one-pipeline simulation is required alongside its lightweight DSP model.
 
 The `what/` branch covers architecture, encoding, resources, configuration, every first-party RTL source by role and focused behavior/gaps. `how/` traces sample processing and simulation; `where/` locates commands; `why/` explains commit and throughput choices. Source review shows SDRAM delay wired through pipeline, engine and top despite the stale README statement. Hardware correctness remains unverified. Retrieve the focused leaf and current RTL before changing a path.
 

@@ -6,7 +6,7 @@ module core_test #(
 		parameter integer acc_width			= 2 * data_width + 8,
 		parameter integer n_blocks			= 256,
 		parameter integer sdram_addr_width 	= 20,
-		parameter integer memory_size		= 8,
+		parameter integer memory_size		= 256,
 		parameter integer n_channels		= 16
 	) (
 		input wire clk,
@@ -14,7 +14,7 @@ module core_test #(
 
 		input wire enable,
 		input wire tick,
-        input wire use_internal_filter,
+        input wire use_internal_resources,
 
 		input wire signed [data_width - 1 : 0] sample_in,
 		output reg signed [data_width - 1 : 0] sample_out,
@@ -76,16 +76,17 @@ module core_test #(
         output wire [4:0] debug_svf_shift,
         output wire [7:0] debug_svf_block,
         output wire debug_filter_invalid,
+        output wire debug_lut_invalid,
         output wire [15:0] stuck_flags
 	);
 
     wire internal_filter_ack, internal_filter_response_valid;
     wire [15:0] internal_filter_response;
     filter_master filters (
-        .clk(clk), .reset(reset), .enable(enable && use_internal_filter),
+        .clk(clk), .reset(reset), .enable(enable && use_internal_resources),
         .alloc_req(1'b0), .coef_write(1'b0), .coef_update(1'b0), .coef_commit(1'b0),
         .coef_write_handle(8'b0), .coef_target(16'b0), .coef_data(18'b0),
-        .req_ack(internal_filter_ack), .req_valid(filter_req_valid && use_internal_filter),
+        .req_ack(internal_filter_ack), .req_valid(filter_req_valid && use_internal_resources),
         .req_in(filter_req), .req_invalid(debug_filter_invalid),
         .req_response(internal_filter_response), .req_response_valid(internal_filter_response_valid),
         .ctrl_data_in(ctrl_data_in), .stuck()
@@ -96,10 +97,22 @@ module core_test #(
     assign debug_svf_damping = filters.svf_req_in.arg_c;
     assign debug_svf_shift = filters.svf_req_in.shift;
     assign debug_svf_block = filters.svf_req_in.block;
+    wire internal_lut_ack, internal_lut_response_valid;
+    wire [15:0] internal_lut_response;
+    lut_master #(.data_width(data_width)) luts (
+        .clk(clk), .reset(reset), .enable(enable && use_internal_resources),
+        .req_ack(internal_lut_ack), .req_valid(lut_req_valid && use_internal_resources),
+        .req_in(lut_req), .req_invalid(debug_lut_invalid),
+        .req_response(internal_lut_response), .req_response_valid(internal_lut_response_valid)
+    );
     dsp_core #(.data_width(data_width), .n_blocks(n_blocks), .memory_size(memory_size), .n_channels(n_channels)) dut (
-        .filter_req_ack(use_internal_filter ? internal_filter_ack : filter_req_ack),
-        .filter_req_response_valid(use_internal_filter ? internal_filter_response_valid : filter_req_response_valid),
-        .filter_req_response(use_internal_filter ? internal_filter_response : filter_req_response), .*
+        .lut_req_ack(use_internal_resources ? internal_lut_ack : lut_req_ack),
+        .lut_req_invalid(use_internal_resources ? debug_lut_invalid : lut_req_invalid),
+        .lut_req_response_valid(use_internal_resources ? internal_lut_response_valid : lut_req_response_valid),
+        .lut_req_response(use_internal_resources ? internal_lut_response : lut_req_response),
+        .filter_req_ack(use_internal_resources ? internal_filter_ack : filter_req_ack),
+        .filter_req_response_valid(use_internal_resources ? internal_filter_response_valid : filter_req_response_valid),
+        .filter_req_response(use_internal_resources ? internal_filter_response : filter_req_response), .*
     );
     assign debug_args = {dut.arg_c_out_ofs, dut.arg_b_out_ofs, dut.arg_a_out_ofs};
     assign debug_fetch = dut.out_valid_ofs & dut.in_ready_router;

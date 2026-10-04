@@ -54,10 +54,14 @@ Pass a WAV filename to retain dry audio on the left and RTL output on the right:
 `./tools/test_eff_svf.sh /tmp/svf.wav`.
 
 The superproject's `python3 tools/effect_library.py` extends this to a batch of
-compiled arithmetic/SVF effects, exact comparison with a separate sample model,
+compiled arithmetic/SVF/LUT/scratchpad effects, exact comparison with a separate sample model,
 parameter corners, response checks and WAV output. Its reusable core mode is
 `--render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm`, using mono signed PCM16.
 Only the final instruction may write c0; resource programming is rejected.
+The renderer performs full reset before programming and uses the actual LUT
+master and 256-word scratchpad. Run it from this repository so `luts/` resolves.
+The superproject's `python3 tools/test_eff_state.py` checks all input words for
+each built-in LUT and a persistent-state/read-after-write recurrence.
 The library guide documents the supported subset and USB deployment.
 
 These harnesses receive programming commands at the core's control strobes. They
