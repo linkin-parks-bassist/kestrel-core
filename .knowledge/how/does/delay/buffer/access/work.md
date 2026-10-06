@@ -1,9 +1,9 @@
 ---
 status: green
-revised_at: "2026-10-04T13:09:35+11:00"
+revised_at: "2026-10-06T12:42:07+11:00"
 ---
 
-Delay modulation happens on the read. The Interface assembler exposes delay_read $d dest (zero modulation), delay_mread $d a b dest and delay_write value $d. Both read forms use opcode 17; writes use 18 and advance the circular write position. There is no delay_mwrite or fractional interpolation.
+Delay modulation happens on the read. The Interface assembler exposes delay_read $d dest (zero modulation), delay_mread $d a b dest and delay_write value $d. Both read forms use opcode 17; writes use 18 and advance the circular write position. delay_mwrite/fractional interpolation are absent.
 
 delay_master allocates buffers sequentially in its 20-bit word-addressed memory space. Allocation carries size and base delay as two 24-bit fields, truncated to the implemented address width. The compiler converts units to samples, enforces at least delay+4 words, and adds 4−(size%4), including four words when already divisible by four. A declared 32-word/8-sample fixture therefore programs 36 words.
 
@@ -15,7 +15,7 @@ Reads use one integer memory address and multiply the returned word by per-buffe
 
 Writes bypass commit_master: the resource branch advances after request acceptance, while delay_master waits for memory acknowledgement before accepting its next operation. Preserve that serialized order. The renderer drains pending delay work before the next sample and includes it in cycle cost.
 
-tools/test_eff_delay.py checks eleven 4096-sample compiled cases: fixed/modulated taps, startup fade, feedback, isolated buffers, negative A with both B signs, exact-zero/negative final offsets, and a literal zero base delay. All 45,056 outputs agree exactly with the model; independent tap and feedback recurrences check intended behavior. The former address-60/outside-36-word case now returns the minimum-one tap. RAM completion varies over 3–11 clocks with per-handle bounds checks. This does not simulate the SDRAM controller, arbiter, refresh, pins or physical timing. The minimum-one source change is not yet flashed to the carrier.
+tools/test_eff_delay.py checks eleven 4096-sample compiled cases: fixed/modulated taps, startup fade, feedback, isolated buffers, negative A with both B signs, exact-zero/negative final offsets, and a literal zero base delay. All 45,056 outputs agree exactly with the model; independent tap and feedback recurrences check intended behavior. The former address-60/outside-36-word case now returns the minimum-one tap. RAM completion varies over 3–11 clocks with per-handle bounds checks. This does not simulate the SDRAM controller, arbiter, refresh, pins or physical timing. Carrier flash includes this repair; physical tap checks remain open. Core's build owner identifies it.
 
 David accepts the delay ISA, has enjoyed flanging, and does not want an exact-offset read instruction. Long-delay modulation remains permitted but discouraged because integer tap quantization becomes objectionable. Fractional interpolation is future work; 24-bit improvement remains unqualified. Older eff/flanger.eff uses obsolete write-modulation syntax and is outside the verified batch.
 

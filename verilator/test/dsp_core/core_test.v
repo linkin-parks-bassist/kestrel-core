@@ -28,6 +28,7 @@ module core_test #(
 		input wire command_instr_write,
         input wire command_alloc_delay,
         input wire command_alloc_filter, command_filter_coef_write,
+        input wire command_filter_coef_update, command_filter_coef_commit,
 		input wire reg_writes_commit,
 		input wire data_req,
 
@@ -78,6 +79,9 @@ module core_test #(
         output wire [4:0] debug_svf_shift,
         output wire [7:0] debug_svf_block,
         output wire debug_filter_invalid,
+        output wire debug_poly_request, debug_poly_ack, debug_poly_response,
+        output wire [7:0] debug_poly_state,
+        output wire debug_filter_response,
         output wire debug_lut_invalid,
         output wire debug_delay_invalid, debug_delay_busy,
         output wire delay_mem_req, delay_mem_write,
@@ -91,9 +95,22 @@ module core_test #(
 
     wire internal_filter_ack, internal_filter_response_valid;
     wire [15:0] internal_filter_response;
+    assign debug_filter_response = internal_filter_response_valid;
+`ifdef ENABLE_POLYNOMIAL
+    assign debug_poly_request = filters.poly_req_valid;
+    assign debug_poly_ack = filters.poly_ack;
+    assign debug_poly_response = filters.poly_valid;
+    assign debug_poly_state = filters.polynomials.state;
+`else
+    assign debug_poly_request = 0;
+    assign debug_poly_ack = 0;
+    assign debug_poly_response = 0;
+    assign debug_poly_state = 0;
+`endif
     filter_master filters (
         .clk(clk), .reset(reset), .enable(enable && use_internal_resources),
-        .alloc_req(command_alloc_filter), .coef_write(command_filter_coef_write), .coef_update(1'b0), .coef_commit(1'b0),
+        .alloc_req(command_alloc_filter), .coef_write(command_filter_coef_write),
+        .coef_update(command_filter_coef_update), .coef_commit(command_filter_coef_commit),
         .coef_write_handle(8'b0), .coef_target(16'b0), .coef_data(18'b0),
         .req_ack(internal_filter_ack), .req_valid(filter_req_valid && use_internal_resources),
         .req_in(filter_req), .req_invalid(debug_filter_invalid),

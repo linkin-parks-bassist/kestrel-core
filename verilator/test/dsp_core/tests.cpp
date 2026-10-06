@@ -219,8 +219,42 @@ static int load_compiled_program(Vcore_test& d, const std::string& path, int blo
 }
 // A reusable one-core audio loop. Resource coverage is deliberately explicit:
 // arithmetic, scratchpad and actual SVF/LUT/delay masters, without SPI, mixer or SDRAM hardware.
+static void apply_polynomial_update(Vcore_test& d, const std::string& path) {
+    std::ifstream input(path, std::ios::binary);
+    require(input.is_open(), "cannot open coefficient update");
+    auto take = [&](int count) {
+        uint64_t value = 0;
+        while (count--) {
+            const int byte = input.get();
+            require(byte != EOF, "truncated coefficient update");
+            value = (value << 8) | byte;
+        }
+        return value;
+    };
+    int commands = 0;
+    while (input.peek() != EOF) {
+        const auto command = take(1), handle = take(1);
+        require(handle < 16, "coefficient update handle outside profile");
+        if (command == 18) {
+            const auto target = take(2), value = take(3);
+            require(target < 128, "coefficient update index outside profile");
+            d.ctrl_data_in = (handle << 40) | (target << 24) | value;
+            d.command_filter_coef_update = 1; tick(d); d.command_filter_coef_update = 0;
+        } else {
+            require(command == 19, "unsupported live update command");
+            d.ctrl_data_in = handle;
+            d.command_filter_coef_commit = 1; tick(d); d.command_filter_coef_commit = 0;
+        }
+        wait(d, 128); // Settle each bank operation; this harness does not model SPI cadence.
+        ++commands;
+    }
+    require(commands > 0, "empty live update");
+    wait(d, 128);
+}
 static void render_program(const std::string& path, const std::string& input_path,
-                           const std::string& output_path) {
+                           const std::string& output_path,
+                           const std::vector<std::pair<size_t, std::string>>& updates = {},
+                           const std::string& trace_path = {}) {
     Vcore_test d;
     d.use_internal_resources = 1;
     load_compiled_program(d, path);
@@ -228,18 +262,35 @@ static void render_program(const std::string& path, const std::string& input_pat
     std::ifstream input(input_path, std::ios::binary);
     std::ofstream output(output_path, std::ios::binary);
     require(input.is_open() && output.is_open(), "cannot open audio files");
+    std::ofstream trace;
+    if (!trace_path.empty()) {
+        trace.open(trace_path);
+        require(trace.is_open(), "cannot open render trace");
+        trace << "frame,cycle,fetch,filter_request,poly_request,poly_ack,poly_state,poly_response,filter_response,write_channel,write_dest\n";
+    }
     size_t frames = 0;
+    size_t next_update = 0;
     int max_cycles = 0;
     while (true) {
         int lo = input.get(), hi;
         if (lo == EOF) break;
         hi = input.get();
         require(hi != EOF, "truncated PCM16 sample");
+        if (next_update < updates.size() && frames == updates[next_update].first) {
+            apply_polynomial_update(d, updates[next_update].second);
+            ++next_update;
+        }
         d.sample_in = uint16_t(lo | hi << 8);
         d.tick = 1; tick(d); d.tick = 0;
         bool written = false;
         int cycles = 0;
         while (!written && cycles < 2551) {
+            if (trace.is_open())
+                trace << frames << ',' << cycles << ',' << int(d.debug_fetch) << ','
+                      << int(d.filter_req_valid) << ',' << int(d.debug_poly_request) << ','
+                      << int(d.debug_poly_ack) << ',' << int(d.debug_poly_state) << ','
+                      << int(d.debug_poly_response) << ',' << int(d.debug_filter_response) << ','
+                      << int(d.write_channel) << ',' << int(d.write_dest) << '\n';
             require(!d.debug_filter_invalid && !d.debug_lut_invalid && !d.debug_delay_invalid && !d.stuck_flags, "audio invalid resource/stuck");
             // Cycle zero is the input injection. Programs must only write c0
             // at their final instruction; intermediate channels hold work.
@@ -257,6 +308,8 @@ static void render_program(const std::string& path, const std::string& input_pat
         ++frames;
     }
     require(frames && bool(output), "empty input or output write failure");
+    require(!trace.is_open() || bool(trace), "render trace write failure");
+    require(next_update == updates.size(), "update frame outside input");
     std::cout << "rendered," << frames << ",max_cycles," << max_cycles << '\n';
 }
 static void run_readback_program(const std::string& path) {
@@ -425,10 +478,26 @@ static void run_svf_audio_program(const std::string& path, const std::string& wa
 }
 int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
+    if (argc > 1 && std::string(argv[1]) == "--render-polynomial-update") {
+        try {
+            require(argc >= 7 && argc % 2 == 1, "usage: --render-polynomial-update PROGRAM.bin INPUT.pcm OUTPUT.pcm UPDATE.bin FRAME [UPDATE.bin FRAME ...]");
+            std::vector<std::pair<size_t, std::string>> updates;
+            for (int i = 5; i < argc; i += 2) {
+                size_t end = 0;
+                const std::string frame(argv[i + 1]);
+                const auto index = std::stoull(frame, &end);
+                require(end == frame.size() && !frame.empty() && frame[0] != '-', "invalid update frame");
+                require(updates.empty() || updates.back().first < index, "update frames must increase");
+                updates.emplace_back(index, argv[i]);
+            }
+            render_program(argv[2], argv[3], argv[4], updates);
+            return 0;
+        } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
+    }
     if (argc > 1 && std::string(argv[1]) == "--render-program") {
         try {
-            require(argc == 5, "usage: --render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm");
-            render_program(argv[2], argv[3], argv[4]);
+            require(argc == 5 || argc == 6, "usage: --render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm [TRACE.csv]");
+            render_program(argv[2], argv[3], argv[4], {}, argc == 6 ? argv[5] : "");
             return 0;
         } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
     }

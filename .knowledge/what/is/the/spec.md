@@ -1,9 +1,9 @@
 ---
 status: green
-revised_at: "2026-10-04T11:15:31+11:00"
+revised_at: "2026-10-05T17:08:19+11:00"
 ---
 
-The documented Core is a programmable 16-bit fixed-point DSP engine with two pipelines, in-order effects at commit, FPGA resource operations and SPI programming. Configuration headers currently select 256 blocks, 16 channels, 112.5 MHz and 44.1 kHz. These are source descriptions, not a complete future acceptance specification.
+Core is a programmable 16-bit fixed-point DSP with two pipelines, ordered commit, resources and SPI programming. Headers select 256 blocks, 16 channels, 112.5 MHz and 44.1 kHz; these source facts are not complete acceptance requirements.
 
 David selects a polynomial-only extraction of the existing filter engine as the default, retaining the working Chamberlin SVF and keeping the original general filter optional. ENABLE_FILTER, ENABLE_POLYNOMIAL and ENABLE_SVF independently include or exclude those units. Preserve polynomial coefficient programming through the existing commands and preserve SVF runtime parameters, stateful update/read pairing and private once-per-sample ordinal state, without configuration handles. External control-written damping, replacement recurrence and broader local history/state architecture are not selected. Polynomial approximation remains important for audio-rate functions such as exponentials.
 
@@ -22,7 +22,7 @@ David's other intended RTL changes are:
 3. Deferred: split MOV and ADD/SUB out of the full MADD path, bypassing redundant multiply and shift stages. David expects substantial throughput gains because these instructions are common; the magnitude remains unmeasured. MOV may go directly to commit, while ADD/SUB need a shorter arithmetic path. Router recognition of MADD x * 1 + 0 is a proposed MOV mechanism, not a settled encoding or equivalence rule. Qualify arithmetic, shift and saturation semantics, hazards, backpressure and ordered retirement before choosing the paths. This work is explicitly deferred; fetch-order changes and cycle measurements come first.
 4. Reconsider the execution-branch choices after the barrel-shifter work. The replacement branch architecture is not yet specified.
 5. During pipeline transitions, use envelopes to compensate for phase cancellation: when the mixed result is substantially quieter than the sum of envelopes, gently increase gain to avoid audible ducking. Envelope definition, normalization, threshold, gain bounds and dynamics remain open.
-6. Add sensible post-processing filters for sub-audible bass and extreme high frequencies, followed by gentle AGC for quality of life. Exact cutoffs, topology, gain behaviour, headroom and acceptance criteria remain open.
+6. Add postprocessing cleanup filters, gentle AGC and a declicker. David's long-planned declicker is unwritten; algorithm, triggering, stage order, latency and acceptance remain open. Filter cutoffs/topology and AGC dynamics/headroom also remain open.
 
 7. Replace system-clock-sampled SPI with a proper SCK-clocked frontend and an explicit crossing into the main SYS_CLK domain. David reports reliability falling off as SCK is increased and expects this change to permit higher reliable SCK frequency; the threshold and gain remain unmeasured. Preserve command/response semantics while defining receive buffering/overflow, reset/enable, CS/framing and MISO/status return crossings. Validate independent clock phases, rates and duty cycles, then qualify reliable SCK limits on hardware. Priority is not yet assigned.
 

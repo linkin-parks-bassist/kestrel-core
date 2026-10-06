@@ -24,6 +24,72 @@ Implements a pipelined fixed-point, programmable audio processing core targeting
 
 Install Verilator and a C++ build toolchain, then run `./run_tests.sh`. Pass module
 names to run a subset, for example `./run_tests.sh operand_fetch dsp_core`.
+`./run_tests.sh spi_control` checks mode-zero filter-command delivery through the
+actual SPI slave and controller at the 10-MHz/112.5-MHz clock ratio. It covers
+eight edge phases, continuous and byte-separated chip select, signed payloads
+and pipeline strobes. Two actual filter masters check repeated numerical bank
+commits, unchanged active results before commit and isolation of the second
+handle. Health/swap responses are stubbed; MISO timing and full audio pipelines
+remain outside this fixture.
+Its optional `PROGRAM.bin UPDATE.bin EXPECTED_SUM [UPDATE.bin EXPECTED_SUM ...]`
+mode replays compiler bodies for the two-polynomial fixture (initial sum -1024,
+constant handle -8192). Superproject `tools/test_eff_poly.py` supplies fresh files.
+Audio instructions reach the controller but are not executed by this fixture.
+Add `--engine` before those filenames to execute compiled polynomial audio through
+the actual FIFO/controller, pipelines/resources, health, gain/crossfade and mixer.
+This mode checks steady outputs and eight signed-input endpoints across live
+commits at 2551 clocks/sample, plus 4,096 continuous changing outputs with fixed
+four-frame latency. It checks eight phases/two chip-select patterns and
+uses a delayed RAM responder at the engine SDRAM boundary; physical SDRAM,
+MISO timing and transition sound remain unqualified.
+Run `./verilator/test/spi_control/run.sh --engine --read32` for 96 exact
+magic/capability word reads through the actual SPI/FIFO/controller/build-register
+path, across eight phases and continuous/byte-separated request chip select.
+Replies use the Interface's separate single-byte READOUT transactions. MISO is
+sampled at the end of each high half-period; this checks reply bytes and status
+restoration, not master-edge setup/hold or a maximum reliable physical SPI rate.
+Optional `PROGRAM.bin EXPECTED_SAMPLE` arguments program the engine at unity
+input/output gains with constant input 16384, wait for activation and settling,
+then require the expected signed16 output every clock during read32 traffic.
+`--engine --render-read32 PROGRAM.bin INPUT.pcm OUTPUT.pcm` injects alternating
+magic/capability reads at cycle 128 of every input frame. Superproject
+`python3 tools/test_eff_engine.py --read32 --effect LEVEL --effect INVPHASE --effect SVFLP`
+checks 1,536 changing outputs and 1,536 read words, with independent unity/polarity
+checks. This PCM mode uses one phase and continuous request CS; reply bytes use
+separate READOUT transactions. Use absolute artifact paths as for `--render`.
+The same readback option checks scratchpad recurrence, feedback and isolated delay
+buffers (`--effect memory-state --effect delay-feedback --effect delay-pair`):
+6,209 exact outputs/words. `tools/test_eff_engine_updates.py --live --read32`
+combines three live commits per LEVEL/SVFLP/SVFHP fixture with one read per frame.
+It checks 1,536 outputs/words against observed dispatch registers and retained SVF
+state. The harness mode is `--render-live-read32`; update frames send their body
+at cycle 128, then start the read 128 clocks after body completion, within the same frame budget.
+For mono PCM16 files use `--engine --render PROGRAM.bin INPUT.pcm OUTPUT.pcm`
+with absolute paths. The renderer compensates the fixed four-frame latency;
+startup/warmup runs with zero input. Superproject `tools/test_eff_engine.py`
+checks six arithmetic/SVF defaults and seven control corners (6,656 exact
+model comparisons). The static polynomial also matches all 65,536 signed inputs.
+The runner includes built-in LUT/scratchpad fixtures (`--resources-only`) and
+settled delay/feedback/paired-buffer fixtures (`--delays-only`). Delay programs
+receive 512 zero-input settling frames. Core’s PCM owner records qualification.
+Named library checks use `--effect NAME`, optional `--param NAME=VALUE` and
+`--samples N`. The renderer writes `OUTPUT.pcm.warmup`; the runner primes model
+state from observed pipeline-B executions, without independently proving startup timing.
+Optional `UPDATE.bin ...` arguments after the output path apply live register
+writes (13/14, terminal sync 15) to the active program during zero-input settling.
+Superproject `tools/test_eff_engine_updates.py` checks three successive update
+bodies each for LEVEL/SVFLP/SVFHP, followed by 1,536 exact final-value outputs.
+With `--live`, the helper checks another 1,536 continuous outputs with retained
+SVF state. `--render-live` accepts update/frame pairs, injecting bodies of at most
+24 bytes at cycle 128 of strictly increasing input frames, including during execution.
+The output's `.registers.csv` records dispatch tuples. The reference groups complete
+executions from block zero, uses fixture-specific observed input alignment,
+requires each compiled state in order, and preserves model state/resources.
+This checks audio under observed activation; independent activation timing,
+broader control programs and physical transition sound remain unqualified.
+PCM rendering currently checks one phase/continuous chip select and uses an
+engine-boundary RAM responder for delays. It does not model converters or
+general startup-state equivalence.
 
 The operand-fetch tests check values, metadata, dependencies, commit IDs,
 backpressure and enable pauses. The core tests execute arithmetic programs through
@@ -57,14 +123,20 @@ The superproject's `python3 tools/effect_library.py` extends this to a batch of
 compiled arithmetic/SVF/LUT/scratchpad/delay effects, exact comparison with a separate sample model,
 parameter corners, response checks and WAV output. Its reusable core mode is
 `--render-program PROGRAM.bin INPUT.pcm OUTPUT.pcm`, using mono signed PCM16.
+Append `TRACE.csv` to capture per-frame fetch, polynomial request/state/result
+and channel-write timing. The reported maximum counts through the tick after
+observing final c0 output, plus any remaining delay-transaction drain; it is not
+the polynomial unit's isolated latency.
 Only the final instruction may write c0; delay and static polynomial allocation/
-coefficient writes are supported. Live coefficient updates and other resource
-programming are rejected. The actual delay unit uses a delayed RAM
+coefficient writes are supported. Use `--render-polynomial-update PROGRAM.bin INPUT.pcm OUTPUT.pcm UPDATE.bin FRAME`
+for a production coefficient-update/commit body at the chosen frame; it settles each command,
+without modeling SPI pacing. Append more `UPDATE.bin FRAME` pairs in increasing frame order
+to check successive commits without reset. Other resource programming is rejected. The actual delay unit uses a delayed RAM
 transaction responder, with per-buffer address checks and nonzero initial words.
 `python3 tools/test_eff_delay.py` in the superproject verifies taps, startup fade,
 feedback and buffer isolation, including minimum-one taps for zero/negative final
 offsets. SDRAM hardware is not modeled. `python3 tools/test_eff_poly.py` verifies
-compiler-programmed quadratic/constant resources over all signed16 inputs.
+compiler-programmed quadratic/constant resources and three live parameter updates over all signed16 inputs.
 The renderer performs full reset before programming and uses the actual LUT
 master and 256-word scratchpad. Run it from this repository so `luts/` resolves.
 The superproject's `python3 tools/test_eff_state.py` checks all input words for
